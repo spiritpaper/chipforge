@@ -7,6 +7,8 @@
   import { lab } from './sfx/lab.svelte'
   import { composer } from './composer/composer.svelte'
   import ComposeView from './components/compose/ComposeView.svelte'
+  import ConvertView from './components/convert/ConvertView.svelte'
+  import { converter } from './convert/converter.svelte'
   import ModeRail from './components/ModeRail.svelte'
   import Transport from './components/Transport.svelte'
   import ChannelStrip from './components/ChannelStrip.svelte'
@@ -24,6 +26,7 @@
     const mode = route.mode
     untrack(() => {
       engine.stop()
+      if (mode !== 'convert') converter.pause()
       if (mode === 'compose') void composer.init().then(() => engine.setSong(composer.song))
     })
   })
@@ -62,6 +65,16 @@
     }
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target, e.code)) return
 
+    if (route.mode === 'convert') {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target, e.code) || !converter.audio) return
+      if (e.code === 'Space') {
+        e.preventDefault()
+        converter.togglePlay()
+      } else if (e.code === 'KeyB') {
+        converter.setOriginal(!converter.original)
+      }
+      return
+    }
     const shortcut = sfxShortcut(e.code, e.shiftKey)
     if (!shortcut || lab.status !== 'ready') return
     e.preventDefault()
@@ -98,6 +111,8 @@
         <ChannelStrip {channel} {info} />
       {/each}
     </section>
+  {:else if route.mode === 'convert'}
+    <ConvertView />
   {:else}
     <SfxLab />
   {/if}

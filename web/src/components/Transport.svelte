@@ -4,6 +4,7 @@
   import type { Mode } from '../lib/hash'
   import { lab } from '../sfx/lab.svelte'
   import { composer } from '../composer/composer.svelte'
+  import { converter } from '../convert/converter.svelte'
 
   let { mode }: { mode: Mode } = $props()
 
@@ -26,6 +27,18 @@
     >
       <PixelIcon name="play" />
       <span>Play</span>
+      <kbd>Space</kbd>
+    </button>
+  {:else if mode === 'convert'}
+    <button
+      class="key play"
+      onclick={() => converter.togglePlay()}
+      aria-pressed={converter.playing}
+      disabled={!converter.audio}
+      title="Play or pause (Space)"
+    >
+      <PixelIcon name={converter.playing ? 'stop' : 'play'} />
+      <span>{converter.playing ? 'Pause' : 'Play'}</span>
       <kbd>Space</kbd>
     </button>
   {:else if mode === 'compose'}

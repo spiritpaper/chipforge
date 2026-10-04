@@ -134,6 +134,17 @@ class ChipEngine {
     this.send({ type: 'previewOff', channel })
   }
 
+  /**
+   * The running AudioContext and the node other audio should connect to (it carries the
+   * master volume). Starts audio if needed, so call it from a user gesture.
+   */
+  async output(): Promise<{ ctx: AudioContext; input: AudioNode } | null> {
+    await this.start()
+    if (this.status !== 'ready' || !this.ctx || !this.gain) return null
+    await this.ctx.resume()
+    return { ctx: this.ctx, input: this.gain }
+  }
+
   get sampleRate(): number {
     return this.ctx?.sampleRate ?? 48_000
   }
