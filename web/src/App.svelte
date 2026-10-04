@@ -4,6 +4,7 @@
   import { isTypingTarget, sfxShortcut, songShortcut } from './lib/keys'
   import { route } from './lib/route.svelte'
   import { lab } from './sfx/lab.svelte'
+  import { demo } from './lib/demo.svelte'
   import ModeRail from './components/ModeRail.svelte'
   import Transport from './components/Transport.svelte'
   import SongView from './components/SongView.svelte'
@@ -12,13 +13,13 @@
   import Toast from './components/Toast.svelte'
 
   $effect(() => {
-    engine.preload()
     void lab.init(route.takeShareCode())
   })
 
   // The demo song belongs to Sound check; leaving it stops the music.
   $effect(() => {
-    if (route.mode !== 'demo') engine.stopSong()
+    if (route.mode === 'demo') engine.setSong(demo.song)
+    else engine.stop()
   })
 
   function onHashChange() {

@@ -5,21 +5,27 @@ import workletUrl from './chip-worklet.ts?worker&url'
 import type { FromWorklet, ToWorklet } from './protocol'
 import { CHANNELS } from './channels'
 import { soloMask } from '../lib/mix'
-import { instantiateChip, readGrid } from './chip-wasm'
 import { loadChipModule } from './wasm'
+import { encodeSong } from '../song/encode'
+import type { Song } from '../song/model'
 
 export type EngineStatus = 'idle' | 'loading' | 'ready' | 'error'
+
+export interface PlayPosition {
+  order: number
+  row: number
+}
 
 class ChipEngine {
   status = $state<EngineStatus>('idle')
   error = $state<string | null>(null)
+  /** Song playback (Compose); one-shot sample playback is tracked separately. */
   playing = $state(false)
-  bpm = $state(140)
-  step = $state(-1)
+  position = $state<PlayPosition | null>(null)
+  loopPattern = $state(false)
   volume = $state(0.8)
   muted = $state<boolean[]>(CHANNELS.map(() => false))
   soloed = $state<number | null>(null)
-  grid = $state.raw<Int32Array[]>([])
   /** Latest scope samples per channel; not deep-reactive, read in animation frames. */
   scopes: Float32Array[] = []
 
@@ -27,29 +33,13 @@ class ChipEngine {
   private node: AudioWorkletNode | null = null
   private gain: GainNode | null = null
   private starting: Promise<void> | null = null
+  private song: Song | null = null
   private sfxSource: AudioBufferSourceNode | null = null
 
   /** One-shot sample playback (SFX Lab), for drawing a playhead. */
   sfxPlaying = $state(false)
   sfxStart = 0
   sfxDuration = 0
-
-  /**
-   * Reads the song on the main thread so it can be shown before audio is allowed to
-   * start. Failures are left for start() to report.
-   */
-  async preload() {
-    try {
-      const wasm = await instantiateChip(await loadChipModule())
-      const chip = wasm.chip_new(48_000)
-      wasm.chip_load_demo(chip)
-      this.grid = readGrid(wasm, chip)
-      this.bpm = wasm.chip_bpm(chip)
-      wasm.chip_free(chip)
-    } catch {
-      // start() reports the failure when the user asks for sound.
-    }
-  }
 
   /** Must be called from a user gesture (browsers block audio until then). */
   start(): Promise<void> {
@@ -64,10 +54,7 @@ class ChipEngine {
   private async boot() {
     this.status = 'loading'
     const ctx = new AudioContext({ latencyHint: 'interactive' })
-    const [module] = await Promise.all([
-      loadChipModule(),
-      ctx.audioWorklet.addModule(workletUrl),
-    ])
+    const [module] = await Promise.all([loadChipModule(), ctx.audioWorklet.addModule(workletUrl)])
     const node = new AudioWorkletNode(ctx, 'chip', {
       numberOfInputs: 0,
       outputChannelCount: [2],
@@ -81,38 +68,75 @@ class ChipEngine {
         const msg = e.data
         if (msg.type === 'ready') {
           resolve()
+        } else if (msg.type === 'songError') {
+          this.error = `The song could not be loaded (code ${msg.code}).`
         } else {
-          this.step = msg.step
+          this.position = msg.position
           this.scopes = msg.scopes
+          // The sequencer only stops on request; this keeps state honest regardless.
+          if (!msg.position && this.playing) this.playing = false
         }
       }
     })
     Object.assign(this, { ctx, node, gain })
     await ready
     this.applyMutes()
-    this.send({ type: 'bpm', bpm: this.bpm })
+    if (this.song) this.sendSong(this.song)
+    this.send({ type: 'loopPattern', on: this.loopPattern })
     this.status = 'ready'
   }
 
-  private send(msg: ToWorklet) {
-    this.node?.port.postMessage(msg)
+  private send(msg: ToWorklet, transfer: Transferable[] = []) {
+    this.node?.port.postMessage(msg, transfer)
   }
 
-  async togglePlay() {
+  private sendSong(song: Song) {
+    const bytes = encodeSong(song)
+    this.send({ type: 'song', bytes }, [bytes.buffer])
+  }
+
+  /** Hands the engine the song to play; call again after every edit. */
+  setSong(song: Song) {
+    if (song === this.song) return
+    this.song = song
+    if (this.status === 'ready') this.sendSong(song)
+  }
+
+  async play(order = 0, row = 0) {
     await this.start()
     if (this.status !== 'ready') return
     await this.ctx!.resume()
-    this.playing = !this.playing
-    this.send({ type: this.playing ? 'play' : 'stop' })
-    if (!this.playing) this.step = -1
+    this.send({ type: 'play', order, row })
+    this.playing = true
   }
 
-  /** Stops the demo song (e.g. when leaving the screen that plays it). */
-  stopSong() {
+  stop() {
     if (!this.playing) return
     this.playing = false
-    this.step = -1
+    this.position = null
     this.send({ type: 'stop' })
+  }
+
+  async togglePlay(order = 0, row = 0) {
+    if (this.playing) this.stop()
+    else await this.play(order, row)
+  }
+
+  setLoopPattern(on: boolean) {
+    this.loopPattern = on
+    this.send({ type: 'loopPattern', on })
+  }
+
+  /** Sounds a note on one channel with an instrument, e.g. while entering notes. */
+  async preview(channel: number, note: number, instrument: number) {
+    await this.start()
+    if (this.status !== 'ready') return
+    void this.ctx!.resume()
+    this.send({ type: 'preview', channel, note, instrument })
+  }
+
+  previewOff(channel: number) {
+    this.send({ type: 'previewOff', channel })
   }
 
   get sampleRate(): number {
@@ -143,12 +167,6 @@ class ChipEngine {
     this.sfxPlaying = true
   }
 
-  setBpm(bpm: number) {
-    if (!Number.isFinite(bpm)) return
-    this.bpm = Math.round(Math.min(300, Math.max(30, bpm)))
-    this.send({ type: 'bpm', bpm: this.bpm })
-  }
-
   setVolume(volume: number) {
     this.volume = volume
     this.gain?.gain.setTargetAtTime(volume, this.ctx!.currentTime, 0.01)
@@ -171,9 +189,7 @@ class ChipEngine {
   }
 
   private applyMutes() {
-    soloMask(this.muted, this.soloed).forEach((muted, channel) =>
-      this.send({ type: 'mute', channel, muted }),
-    )
+    soloMask(this.muted, this.soloed).forEach((muted, channel) => this.send({ type: 'mute', channel, muted }))
   }
 }
 

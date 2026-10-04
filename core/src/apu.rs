@@ -1,7 +1,8 @@
 //! NES 2A03-style sound channels.
 //!
-//! Each channel returns its raw output level in the chip's 4-bit domain (0.0..=15.0);
-//! [`crate::chip::Chip`] mixes them with the APU's nonlinear mixer.
+//! The sequencer sets each channel's [`Voice`] once per tick; each channel then returns
+//! its raw output level in the chip's 4-bit domain (0.0..=15.0) every sample, which
+//! [`crate::chip::Chip`] mixes with the APU's nonlinear mixer.
 
 /// NTSC 2A03 CPU clock; every channel timer is derived from it.
 pub const CPU_HZ: f64 = 1_789_773.0;
@@ -21,7 +22,18 @@ const TRIANGLE_STEPS: [u8; 32] = [
 ];
 
 pub fn midi_to_hz(note: u8) -> f64 {
-    440.0 * 2f64.powf((note as f64 - 69.0) / 12.0)
+    semitones_to_hz(note as f32)
+}
+
+/// Frequency of a (possibly fractional) MIDI note number.
+pub fn semitones_to_hz(semitones: f32) -> f64 {
+    440.0 * 2f64.powf((semitones as f64 - 69.0) / 12.0)
+}
+
+/// Noise period register for a note: higher notes give higher-pitched noise, and the
+/// 16 periods repeat every 16 semitones, like FamiTracker's 0–F noise notes.
+pub fn noise_period(semitones: f32) -> u8 {
+    15 - (semitones.round() as i32).rem_euclid(16) as u8
 }
 
 /// The 11-bit timer value the hardware would use for `hz`, or `None` if out of range
@@ -46,28 +58,6 @@ pub fn triangle_hz(timer: u16) -> f64 {
     CPU_HZ / (32.0 * (timer as f64 + 1.0))
 }
 
-/// Linear volume decay, quantized to the chip's 16 volume steps on output.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Envelope {
-    level: f32,
-    decay_per_sec: f32,
-}
-
-impl Envelope {
-    pub fn trigger(&mut self, volume: u8, decay_per_sec: f32) {
-        self.level = volume.min(15) as f32;
-        self.decay_per_sec = decay_per_sec.max(0.0);
-    }
-
-    pub fn advance(&mut self, dt: f32) {
-        self.level = (self.level - self.decay_per_sec * dt).max(0.0);
-    }
-
-    pub fn volume(&self) -> u8 {
-        self.level.ceil() as u8
-    }
-}
-
 /// Band-limited step correction, so high notes don't alias into noise.
 pub(crate) fn poly_blep(t: f32, dt: f32) -> f32 {
     if t < dt {
@@ -81,45 +71,50 @@ pub(crate) fn poly_blep(t: f32, dt: f32) -> f32 {
     }
 }
 
+/// The parameters the sequencer writes to a channel on every tick.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Voice {
+    /// MIDI note number, fractional for slides and vibrato.
+    pub semitones: f32,
+    /// 0..=15; zero silences the channel (the triangle halts).
+    pub volume: u8,
+    /// Pulse: index into [`DUTY_CYCLES`]. Noise: bit 0 selects short (metallic) mode.
+    pub duty: u8,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Pulse {
-    /// Index into [`DUTY_CYCLES`].
-    pub duty: u8,
+    duty: u8,
     phase: f32,
     inc: f32,
-    env: Envelope,
-    gate: bool,
+    volume: u8,
 }
 
 impl Pulse {
-    pub fn note_on(&mut self, note: u8, volume: u8, decay_per_sec: f32, sample_rate: f32) {
-        match pulse_timer(midi_to_hz(note)) {
-            Some(t) => {
+    /// Applies a voice, or silences the channel with `None`. Pitch is quantized to the
+    /// 11-bit timer, and notes the hardware can't play are silent.
+    pub fn set(&mut self, voice: Option<Voice>, sample_rate: f32) {
+        let timer = voice.and_then(|v| pulse_timer(semitones_to_hz(v.semitones)));
+        match (voice, timer) {
+            (Some(v), Some(t)) => {
                 self.inc = (pulse_hz(t) / sample_rate as f64) as f32;
-                self.env.trigger(volume, decay_per_sec);
-                self.gate = true;
+                self.volume = v.volume.min(15);
+                self.duty = v.duty & 3;
             }
-            None => self.gate = false,
+            _ => self.volume = 0,
         }
     }
 
-    pub fn note_off(&mut self) {
-        self.gate = false;
-    }
-
-    pub fn sample(&mut self, dt: f32) -> f32 {
-        if !self.gate || self.inc == 0.0 {
+    pub fn sample(&mut self) -> f32 {
+        if self.volume == 0 || self.inc == 0.0 {
             return 0.0;
         }
-        let duty = DUTY_CYCLES[(self.duty & 3) as usize];
+        let duty = DUTY_CYCLES[self.duty as usize];
         let mut bipolar = if self.phase < duty { 1.0 } else { -1.0 };
         bipolar += poly_blep(self.phase, self.inc);
         bipolar -= poly_blep((self.phase - duty + 1.0) % 1.0, self.inc);
-
         self.phase = (self.phase + self.inc) % 1.0;
-        let level = self.env.volume() as f32;
-        self.env.advance(dt);
-        level * (0.5 + 0.5 * bipolar).clamp(0.0, 1.0)
+        self.volume as f32 * (0.5 + 0.5 * bipolar).clamp(0.0, 1.0)
     }
 }
 
@@ -127,7 +122,7 @@ impl Pulse {
 pub struct Triangle {
     phase: f32,
     inc: f32,
-    gate: bool,
+    running: bool,
 }
 
 impl Default for Triangle {
@@ -136,32 +131,31 @@ impl Default for Triangle {
         Self {
             phase: 0.5,
             inc: 0.0,
-            gate: false,
+            running: false,
         }
     }
 }
 
 impl Triangle {
-    /// The triangle has no volume control on the 2A03: it is either running or held.
-    pub fn note_on(&mut self, note: u8, sample_rate: f32) {
-        match triangle_timer(midi_to_hz(note)) {
+    /// The triangle has no volume control on the 2A03: any non-zero volume runs it.
+    pub fn set(&mut self, voice: Option<Voice>, sample_rate: f32) {
+        let timer = voice
+            .filter(|v| v.volume > 0)
+            .and_then(|v| triangle_timer(semitones_to_hz(v.semitones)));
+        match timer {
             Some(t) => {
                 self.inc = (triangle_hz(t) / sample_rate as f64) as f32;
-                self.gate = true;
+                self.running = true;
             }
-            None => self.gate = false,
+            None => self.running = false,
         }
-    }
-
-    pub fn note_off(&mut self) {
-        self.gate = false;
     }
 
     /// When stopped, the sequencer halts and holds its current step, like the hardware,
     /// which avoids a click on every note-off.
     pub fn sample(&mut self) -> f32 {
         let value = TRIANGLE_STEPS[(self.phase * 32.0) as usize % 32] as f32;
-        if self.gate {
+        if self.running {
             self.phase = (self.phase + self.inc) % 1.0;
         }
         value
@@ -172,11 +166,10 @@ impl Triangle {
 pub struct Noise {
     lfsr: u16,
     /// Short mode taps bit 6 instead of bit 1, giving a 93-step metallic loop.
-    pub short: bool,
+    short: bool,
     clocks_per_sample: f64,
     acc: f64,
-    env: Envelope,
-    gate: bool,
+    volume: u8,
 }
 
 impl Default for Noise {
@@ -186,30 +179,22 @@ impl Default for Noise {
             short: false,
             clocks_per_sample: 0.0,
             acc: 0.0,
-            env: Envelope::default(),
-            gate: false,
+            volume: 0,
         }
     }
 }
 
 impl Noise {
-    pub fn hit(
-        &mut self,
-        period: u8,
-        short: bool,
-        volume: u8,
-        decay_per_sec: f32,
-        sample_rate: f32,
-    ) {
-        let cycles = NOISE_PERIODS[(period & 15) as usize] as f64;
-        self.clocks_per_sample = CPU_HZ / cycles / sample_rate as f64;
-        self.short = short;
-        self.env.trigger(volume, decay_per_sec);
-        self.gate = true;
-    }
-
-    pub fn note_off(&mut self) {
-        self.gate = false;
+    pub fn set(&mut self, voice: Option<Voice>, sample_rate: f32) {
+        match voice {
+            Some(v) => {
+                let cycles = NOISE_PERIODS[noise_period(v.semitones) as usize] as f64;
+                self.clocks_per_sample = CPU_HZ / cycles / sample_rate as f64;
+                self.short = v.duty & 1 == 1;
+                self.volume = v.volume.min(15);
+            }
+            None => self.volume = 0,
+        }
     }
 
     pub fn clock_lfsr(&mut self) {
@@ -222,8 +207,8 @@ impl Noise {
         self.lfsr
     }
 
-    pub fn sample(&mut self, dt: f32) -> f32 {
-        if !self.gate {
+    pub fn sample(&mut self) -> f32 {
+        if self.volume == 0 {
             return 0.0;
         }
         self.acc += self.clocks_per_sample;
@@ -231,9 +216,11 @@ impl Noise {
             self.acc -= 1.0;
             self.clock_lfsr();
         }
-        let level = self.env.volume() as f32;
-        self.env.advance(dt);
-        if self.lfsr & 1 == 0 { level } else { 0.0 }
+        if self.lfsr & 1 == 0 {
+            self.volume as f32
+        } else {
+            0.0
+        }
     }
 }
 
@@ -269,14 +256,19 @@ mod tests {
         assert_eq!(pulse_timer(20_000.0), None);
     }
 
+    fn voice(semitones: f32, duty: u8) -> Option<Voice> {
+        Some(Voice {
+            semitones,
+            volume: 15,
+            duty,
+        })
+    }
+
     #[test]
     fn pulse_plays_requested_pitch() {
-        let mut p = Pulse {
-            duty: 2,
-            ..Default::default()
-        };
-        p.note_on(69, 15, 0.0, SR);
-        let out: Vec<f32> = (0..SR as usize / 4).map(|_| p.sample(1.0 / SR)).collect();
+        let mut p = Pulse::default();
+        p.set(voice(69.0, 2), SR);
+        let out: Vec<f32> = (0..SR as usize / 4).map(|_| p.sample()).collect();
         let hz = measure_hz(&out);
         assert!((hz - 440.0).abs() < 2.0, "measured {hz}");
     }
@@ -284,12 +276,9 @@ mod tests {
     #[test]
     fn pulse_duty_sets_high_fraction() {
         for (duty, expected) in DUTY_CYCLES.iter().enumerate() {
-            let mut p = Pulse {
-                duty: duty as u8,
-                ..Default::default()
-            };
-            p.note_on(57, 15, 0.0, SR);
-            let out: Vec<f32> = (0..SR as usize).map(|_| p.sample(1.0 / SR)).collect();
+            let mut p = Pulse::default();
+            p.set(voice(57.0, duty as u8), SR);
+            let out: Vec<f32> = (0..SR as usize).map(|_| p.sample()).collect();
             let high = out.iter().filter(|&&v| v > 7.5).count() as f32 / out.len() as f32;
             assert!((high - expected).abs() < 0.02, "duty {duty}: {high}");
         }
@@ -303,7 +292,7 @@ mod tests {
     #[test]
     fn triangle_steps_through_all_16_levels() {
         let mut t = Triangle::default();
-        t.note_on(45, SR);
+        t.set(voice(45.0, 0), SR);
         let mut seen = [false; 16];
         for _ in 0..SR as usize / 10 {
             seen[t.sample() as usize] = true;
@@ -314,11 +303,11 @@ mod tests {
     #[test]
     fn triangle_holds_level_after_note_off() {
         let mut t = Triangle::default();
-        t.note_on(45, SR);
+        t.set(voice(45.0, 0), SR);
         for _ in 0..137 {
             t.sample();
         }
-        t.note_off();
+        t.set(None, SR);
         let held = t.sample();
         assert!((0..100).all(|_| t.sample() == held));
     }
@@ -349,13 +338,35 @@ mod tests {
     }
 
     #[test]
-    fn envelope_decays_to_silence() {
-        let mut e = Envelope::default();
-        e.trigger(15, 30.0);
-        assert_eq!(e.volume(), 15);
-        for _ in 0..SR as usize {
-            e.advance(1.0 / SR);
-        }
-        assert_eq!(e.volume(), 0);
+    fn noise_period_rises_with_note() {
+        assert_eq!(noise_period(0.0), 15);
+        assert_eq!(noise_period(15.0), 0);
+        assert_eq!(noise_period(16.0), 15);
+        assert_eq!(noise_period(-1.0), 0);
+    }
+
+    #[test]
+    fn zero_volume_silences_and_halts() {
+        let mut p = Pulse::default();
+        p.set(
+            Some(Voice {
+                semitones: 60.0,
+                volume: 0,
+                duty: 2,
+            }),
+            SR,
+        );
+        assert!((0..100).all(|_| p.sample() == 0.0));
+        let mut t = Triangle::default();
+        t.set(
+            Some(Voice {
+                semitones: 45.0,
+                volume: 0,
+                duty: 0,
+            }),
+            SR,
+        );
+        let first = t.sample();
+        assert!((0..100).all(|_| t.sample() == first));
     }
 }

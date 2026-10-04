@@ -5,9 +5,9 @@
 
 #![allow(clippy::missing_safety_doc)]
 
-use crate::chip::{CHANNELS, Chip, SCOPE_LEN};
+use crate::chip::{CHANNELS, Chip, Rendered, SCOPE_LEN};
 use crate::sfx::{self, SfxParams};
-use crate::song::{self, Cell, Drum};
+use crate::tracker::{DecodeError, Song};
 
 #[unsafe(no_mangle)]
 pub extern "C" fn chip_new(sample_rate: f32) -> *mut Chip {
@@ -26,14 +26,56 @@ pub unsafe extern "C" fn chip_render(chip: *mut Chip, frames: u32) -> *const f32
     unsafe { &mut *chip }.render(frames as usize).as_ptr()
 }
 
+/// Allocates `len` bytes for JS to fill (e.g. an encoded song). Free with [`buffer_free`].
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn chip_load_demo(chip: *mut Chip) {
-    unsafe { &mut *chip }.load_song(song::demo());
+pub extern "C" fn buffer_alloc(len: u32) -> *mut u8 {
+    let mut buf = vec![0u8; len as usize].into_boxed_slice();
+    let ptr = buf.as_mut_ptr();
+    std::mem::forget(buf);
+    ptr
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn chip_play(chip: *mut Chip) {
-    unsafe { &mut *chip }.play();
+pub unsafe extern "C" fn buffer_free(ptr: *mut u8, len: u32) {
+    if !ptr.is_null() {
+        drop(unsafe { Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, len as usize)) });
+    }
+}
+
+unsafe fn bytes<'a>(ptr: *const u8, len: u32) -> &'a [u8] {
+    if ptr.is_null() {
+        &[]
+    } else {
+        unsafe { std::slice::from_raw_parts(ptr, len as usize) }
+    }
+}
+
+/// Error codes returned by [`chip_load_song`] and [`song_render`].
+fn decode_status(err: DecodeError) -> i32 {
+    match err {
+        DecodeError::BadMagic => -1,
+        DecodeError::UnsupportedVersion(_) => -2,
+        DecodeError::Truncated => -3,
+        DecodeError::BadHeader(_) => -4,
+        DecodeError::BadOrder(_) => -5,
+    }
+}
+
+/// Loads an encoded song (see `tracker` docs), keeping playback going. 0 on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn chip_load_song(chip: *mut Chip, ptr: *const u8, len: u32) -> i32 {
+    match Song::decode(unsafe { bytes(ptr, len) }) {
+        Ok(song) => {
+            unsafe { &mut *chip }.load_song(song);
+            0
+        }
+        Err(e) => decode_status(e),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn chip_play_from(chip: *mut Chip, order: u32, row: u32) {
+    unsafe { &mut *chip }.play_from(order as usize, row as usize);
 }
 
 #[unsafe(no_mangle)]
@@ -42,13 +84,16 @@ pub unsafe extern "C" fn chip_stop(chip: *mut Chip) {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn chip_set_bpm(chip: *mut Chip, bpm: f32) {
-    unsafe { &mut *chip }.set_bpm(bpm);
+pub unsafe extern "C" fn chip_set_loop_pattern(chip: *mut Chip, on: u32) {
+    unsafe { &mut *chip }.player_mut().set_loop_pattern(on != 0);
 }
 
+/// Playback position packed as `order << 16 | row`, or -1 when stopped.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn chip_bpm(chip: *const Chip) -> f32 {
-    unsafe { &*chip }.bpm()
+pub unsafe extern "C" fn chip_position(chip: *const Chip) -> i32 {
+    unsafe { &*chip }
+        .position()
+        .map_or(-1, |p| ((p.order as i32) << 16) | p.row as i32)
 }
 
 #[unsafe(no_mangle)]
@@ -56,48 +101,59 @@ pub unsafe extern "C" fn chip_set_muted(chip: *mut Chip, channel: u32, muted: u3
     unsafe { &mut *chip }.set_muted(channel as usize, muted != 0);
 }
 
+/// Plays a note outside the song, e.g. while typing notes in the editor.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn chip_note_on(chip: *mut Chip, channel: u32, note: u32, volume: u32) {
-    unsafe { &mut *chip }.note_on(
+pub unsafe extern "C" fn chip_preview(chip: *mut Chip, channel: u32, note: u32, instrument: u32) {
+    unsafe { &mut *chip }.player_mut().preview(
         channel as usize,
         note.min(127) as u8,
-        volume.min(15) as u8,
-        4.0,
+        instrument.min(254) as u8,
     );
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn chip_note_off(chip: *mut Chip, channel: u32) {
-    unsafe { &mut *chip }.note_off(channel as usize);
+pub unsafe extern "C" fn chip_preview_off(chip: *mut Chip, channel: u32) {
+    unsafe { &mut *chip }
+        .player_mut()
+        .preview_off(channel as usize);
 }
 
-/// Current sequencer step, or -1 when stopped.
+/// Renders an encoded song once through for export. Returns null if it doesn't decode.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn chip_current_step(chip: *const Chip) -> i32 {
-    unsafe { &*chip }.current_step().map_or(-1, |s| s as i32)
+pub unsafe extern "C" fn song_render(ptr: *const u8, len: u32, sample_rate: f32) -> *mut Rendered {
+    match Song::decode(unsafe { bytes(ptr, len) }) {
+        Ok(song) => Box::into_raw(Box::new(Chip::render_song(
+            song,
+            sample_rate.clamp(8000.0, 192_000.0),
+        ))),
+        Err(_) => std::ptr::null_mut(),
+    }
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn chip_song_length(chip: *const Chip) -> u32 {
-    unsafe { &*chip }.song().map_or(0, |s| s.len() as u32)
+pub unsafe extern "C" fn rendered_samples(r: *const Rendered) -> *const f32 {
+    unsafe { &*r }.samples.as_ptr()
 }
 
-/// A song cell encoded for the UI: -1 hold, -2 off, 0..=127 MIDI note,
-/// 128/129/130 kick/snare/hat, -3 out of range.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn chip_cell(chip: *const Chip, channel: u32, step: u32) -> i32 {
-    let cell = unsafe { &*chip }
-        .song()
-        .and_then(|s| s.tracks.get(channel as usize))
-        .and_then(|t| t.cells.get(step as usize));
-    match cell {
-        Some(Cell::Hold) => -1,
-        Some(Cell::Off) => -2,
-        Some(Cell::Note(n)) => *n as i32,
-        Some(Cell::Drum(Drum::Kick)) => 128,
-        Some(Cell::Drum(Drum::Snare)) => 129,
-        Some(Cell::Drum(Drum::Hat)) => 130,
-        None => -3,
+pub unsafe extern "C" fn rendered_len(r: *const Rendered) -> u32 {
+    unsafe { &*r }.samples.len() as u32
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rendered_loop_start(r: *const Rendered) -> u32 {
+    unsafe { &*r }.loop_start as u32
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rendered_looped(r: *const Rendered) -> u32 {
+    unsafe { &*r }.looped as u32
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rendered_free(r: *mut Rendered) {
+    if !r.is_null() {
+        drop(unsafe { Box::from_raw(r) });
     }
 }
 

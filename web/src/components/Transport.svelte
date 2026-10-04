@@ -3,6 +3,7 @@
   import PixelIcon from './PixelIcon.svelte'
   import type { Mode } from '../lib/hash'
   import { lab } from '../sfx/lab.svelte'
+  import { demo } from '../lib/demo.svelte'
 
   let { mode }: { mode: Mode } = $props()
 
@@ -45,16 +46,16 @@
   <div class="field">
     <label for="bpm">Tempo</label>
     <div class="stepper">
-      <button class="key small" onclick={() => engine.setBpm(engine.bpm - 1)} aria-label="Slower">−</button>
+      <button class="key small" onclick={() => demo.setBpm(demo.song.bpm - 1)} aria-label="Slower">−</button>
       <input
         id="bpm"
         type="number"
         min="30"
         max="300"
-        value={engine.bpm}
-        onchange={(e) => engine.setBpm(e.currentTarget.valueAsNumber)}
+        value={demo.song.bpm}
+        onchange={(e) => demo.setBpm(e.currentTarget.valueAsNumber)}
       />
-      <button class="key small" onclick={() => engine.setBpm(engine.bpm + 1)} aria-label="Faster">+</button>
+      <button class="key small" onclick={() => demo.setBpm(demo.song.bpm + 1)} aria-label="Faster">+</button>
     </div>
     <span class="unit">BPM</span>
   </div>

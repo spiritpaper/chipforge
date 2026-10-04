@@ -1,39 +1,40 @@
 <script lang="ts">
   import { engine } from '../audio/engine.svelte'
   import { CHANNELS } from '../audio/channels'
-  import { cellLabel, isDrum, pitchPosition, segments } from '../lib/grid'
+  import { pitchPosition, segments } from '../lib/grid'
+  import { demo } from '../lib/demo.svelte'
+  import { noteName } from '../song/model'
 
   const STEPS_PER_BAR = 16
   const ROW_H = 56
   const NOTE_H = 6
 
+  const pattern = $derived(demo.song.patterns[0])
   const tracks = $derived(
-    engine.grid.map((cells) => {
+    pattern.channels.map((cells, ch) => {
       const segs = segments(cells)
-      const pitches = segs.filter((s) => !isDrum(s.value)).map((s) => s.value)
+      const pitches = segs.map((s) => s.note)
       const lowest = Math.min(...pitches)
       const highest = Math.max(...pitches)
       return segs.map((s) => ({
         ...s,
-        y: (1 - pitchPosition(s.value, lowest, highest)) * (ROW_H - NOTE_H - 8) + 4,
-        label: cellLabel(s.value),
+        y: (1 - pitchPosition(s.note, lowest, highest)) * (ROW_H - NOTE_H - 8) + 4,
+        // Noise "notes" pick a noise pitch, so name the drum instead.
+        label: ch === 3 ? (demo.song.instruments[s.instrument ?? 0]?.name ?? 'Drum') : noteName(s.note),
       }))
     }),
   )
-  const length = $derived(engine.grid[0]?.length ?? 0)
+  const length = $derived(demo.song.patternLength)
+  const step = $derived(engine.position?.row ?? -1)
 </script>
 
 <section class="song" aria-labelledby="song-title">
   <div class="intro">
-    <h1 id="song-title">First Light</h1>
+    <h1 id="song-title">{demo.song.title}</h1>
     <p>A four-bar loop in A minor, played live by the chip core.</p>
   </div>
 
-  {#if length === 0}
-    <div class="empty">
-      <p>Loading the song…</p>
-    </div>
-  {:else}
+  {#if length > 0}
     <div class="grid" style:--steps={length}>
       {#each CHANNELS as ch, i (ch.name)}
         <div class="row" class:silent={!engine.audible(i)} style:--c={ch.color}>
@@ -51,7 +52,7 @@
             {#each tracks[i] as seg (seg.start)}
               <rect
                 class="note"
-                class:on={engine.step >= seg.start && engine.step < seg.start + seg.length}
+                class:on={step >= seg.start && step < seg.start + seg.length}
                 x={seg.start + 0.1}
                 y={seg.y}
                 width={seg.length - 0.2}
@@ -60,8 +61,8 @@
                 <title>{seg.label}</title>
               </rect>
             {/each}
-            {#if engine.step >= 0}
-              <rect class="playhead" x={engine.step} y="0" width="1" height={ROW_H} />
+            {#if step >= 0}
+              <rect class="playhead" x={step} y="0" width="1" height={ROW_H} />
             {/if}
           </svg>
         </div>
@@ -94,16 +95,6 @@
     max-width: 60ch;
   }
 
-  .empty {
-    display: grid;
-    place-items: center;
-    min-height: 240px;
-    border: 1px dashed var(--line);
-    border-radius: var(--radius-key);
-    color: var(--muted);
-    text-align: center;
-    padding: calc(var(--u) * 6);
-  }
 
   .grid {
     flex: 1;

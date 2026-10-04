@@ -8,4 +8,4 @@ pub mod chip;
 pub mod dsp;
 pub mod ffi;
 pub mod sfx;
-pub mod song;
+pub mod tracker;

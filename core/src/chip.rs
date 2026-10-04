@@ -1,41 +1,41 @@
-//! The whole chip: four channels, the APU's nonlinear mixer, output filters, a step
-//! sequencer and per-channel scope capture for the UI.
+//! The whole chip: four channels, the APU's nonlinear mixer, output filters, the
+//! tracker [`Player`] that drives them, and per-channel scope capture for the UI.
 
 use crate::apu::{Noise, Pulse, Triangle};
 use crate::dsp::OnePole;
-use crate::song::{Cell, Song};
+use crate::tracker::{Player, Position, Song};
 
 pub const CHANNELS: usize = 4;
 pub const MAX_BLOCK: usize = 4096;
 pub const SCOPE_LEN: usize = 1024;
+/// Offline renders stop here even if the song never loops.
+pub const MAX_RENDER_SECONDS: f32 = 600.0;
 
 const OUTPUT_GAIN: f32 = 1.6;
 
-/// Steps through a [`Song`] with sample-accurate timing.
-#[derive(Clone, Debug)]
-struct Sequencer {
-    playing: bool,
-    bpm: f32,
-    next_step: usize,
-    current_step: Option<usize>,
-    samples_to_next: f64,
-}
-
 pub struct Chip {
     sample_rate: f32,
-    pub pulse1: Pulse,
-    pub pulse2: Pulse,
-    pub triangle: Triangle,
-    pub noise: Noise,
+    pulse1: Pulse,
+    pulse2: Pulse,
+    triangle: Triangle,
+    noise: Noise,
     muted: [bool; CHANNELS],
     high_pass: OnePole,
     low_pass: OnePole,
-    song: Option<Song>,
-    seq: Sequencer,
+    player: Player,
     out: Vec<f32>,
     scope: [[f32; SCOPE_LEN]; CHANNELS],
     scope_pos: usize,
     scope_snapshot: [f32; SCOPE_LEN],
+}
+
+/// A song rendered once through, for export.
+pub struct Rendered {
+    pub samples: Vec<f32>,
+    /// Where the looping part begins; the loop ends at `samples.len()`.
+    pub loop_start: usize,
+    /// False if the render hit [`MAX_RENDER_SECONDS`] before the song looped.
+    pub looped: bool,
 }
 
 impl Chip {
@@ -49,14 +49,7 @@ impl Chip {
             muted: [false; CHANNELS],
             high_pass: OnePole::new(37.0, sample_rate),
             low_pass: OnePole::new(14_000.0, sample_rate),
-            song: None,
-            seq: Sequencer {
-                playing: false,
-                bpm: 120.0,
-                next_step: 0,
-                current_step: None,
-                samples_to_next: 0.0,
-            },
+            player: Player::default(),
             out: vec![0.0; MAX_BLOCK],
             scope: [[0.0; SCOPE_LEN]; CHANNELS],
             scope_pos: 0,
@@ -64,49 +57,29 @@ impl Chip {
         }
     }
 
+    pub fn player(&self) -> &Player {
+        &self.player
+    }
+
+    pub fn player_mut(&mut self) -> &mut Player {
+        &mut self.player
+    }
+
+    /// Loads an edited song without interrupting playback.
     pub fn load_song(&mut self, song: Song) {
-        self.seq.bpm = song.bpm;
-        self.pulse1.duty = song.tracks[0].duty;
-        self.pulse2.duty = song.tracks[1].duty;
-        self.song = Some(song);
-        self.stop();
+        self.player.replace_song(song);
     }
 
-    pub fn song(&self) -> Option<&Song> {
-        self.song.as_ref()
+    pub fn play_from(&mut self, order: usize, row: usize) {
+        self.player.play_from(order, row);
     }
 
-    pub fn play(&mut self) {
-        if self.song.is_some() {
-            self.seq.playing = true;
-        }
-    }
-
-    /// Stops the sequencer, rewinds and silences every channel.
     pub fn stop(&mut self) {
-        self.seq.playing = false;
-        self.seq.next_step = 0;
-        self.seq.current_step = None;
-        self.seq.samples_to_next = 0.0;
-        for ch in 0..CHANNELS {
-            self.note_off(ch);
-        }
+        self.player.stop();
     }
 
-    pub fn is_playing(&self) -> bool {
-        self.seq.playing
-    }
-
-    pub fn current_step(&self) -> Option<usize> {
-        self.seq.current_step
-    }
-
-    pub fn bpm(&self) -> f32 {
-        self.seq.bpm
-    }
-
-    pub fn set_bpm(&mut self, bpm: f32) {
-        self.seq.bpm = bpm.clamp(30.0, 300.0);
+    pub fn position(&self) -> Option<Position> {
+        self.player.position()
     }
 
     pub fn set_muted(&mut self, channel: usize, muted: bool) {
@@ -119,72 +92,24 @@ impl Chip {
         self.muted.get(channel).copied().unwrap_or(false)
     }
 
-    pub fn note_on(&mut self, channel: usize, note: u8, volume: u8, decay_per_sec: f32) {
+    fn apply_voices(&mut self) {
+        let [p1, p2, t, n] = *self.player.voices();
         let sr = self.sample_rate;
-        match channel {
-            0 => self.pulse1.note_on(note, volume, decay_per_sec, sr),
-            1 => self.pulse2.note_on(note, volume, decay_per_sec, sr),
-            2 => self.triangle.note_on(note, sr),
-            // On the noise channel the note picks one of the 16 noise periods.
-            3 => self
-                .noise
-                .hit(15 - note % 16, false, volume, decay_per_sec, sr),
-            _ => {}
-        }
-    }
-
-    pub fn note_off(&mut self, channel: usize) {
-        match channel {
-            0 => self.pulse1.note_off(),
-            1 => self.pulse2.note_off(),
-            2 => self.triangle.note_off(),
-            3 => self.noise.note_off(),
-            _ => {}
-        }
-    }
-
-    fn step_length_samples(&self, song: &Song) -> f64 {
-        self.sample_rate as f64 * 60.0 / (self.seq.bpm as f64 * song.steps_per_beat as f64)
-    }
-
-    fn advance_sequencer(&mut self) {
-        let Some(song) = self.song.as_ref().filter(|_| self.seq.playing) else {
-            return;
-        };
-        if self.seq.samples_to_next <= 0.0 {
-            let step = self.seq.next_step;
-            let step_len = self.step_length_samples(song);
-            let cells: [Cell; CHANNELS] = std::array::from_fn(|ch| song.tracks[ch].cells[step]);
-            let voices: [(u8, f32); CHANNELS] =
-                std::array::from_fn(|ch| (song.tracks[ch].volume, song.tracks[ch].decay_per_sec));
-            self.seq.next_step = (step + 1) % song.len();
-            self.seq.current_step = Some(step);
-            self.seq.samples_to_next += step_len;
-
-            for (ch, cell) in cells.into_iter().enumerate() {
-                let (volume, decay) = voices[ch];
-                match cell {
-                    Cell::Hold => {}
-                    Cell::Off => self.note_off(ch),
-                    Cell::Note(n) => self.note_on(ch, n, volume, decay),
-                    Cell::Drum(d) => {
-                        let (period, short, vol, decay) = d.voice();
-                        self.noise.hit(period, short, vol, decay, self.sample_rate);
-                    }
-                }
-            }
-        }
-        self.seq.samples_to_next -= 1.0;
+        self.pulse1.set(p1, sr);
+        self.pulse2.set(p2, sr);
+        self.triangle.set(t, sr);
+        self.noise.set(n, sr);
     }
 
     fn next_sample(&mut self) -> f32 {
-        self.advance_sequencer();
-        let dt = 1.0 / self.sample_rate;
+        if self.player.clock(self.sample_rate) {
+            self.apply_voices();
+        }
         let raw = [
-            self.pulse1.sample(dt),
-            self.pulse2.sample(dt),
+            self.pulse1.sample(),
+            self.pulse2.sample(),
             self.triangle.sample(),
-            self.noise.sample(dt),
+            self.noise.sample(),
         ];
 
         let pos = self.scope_pos;
@@ -223,6 +148,39 @@ impl Chip {
         &self.out[..frames]
     }
 
+    /// Plays `song` from the top on a fresh chip until it first loops back.
+    pub fn render_song(song: Song, sample_rate: f32) -> Rendered {
+        let mut chip = Chip::new(sample_rate);
+        let order_count = song.order.len();
+        chip.load_song(song);
+        chip.play_from(0, 0);
+        let max = (MAX_RENDER_SECONDS * sample_rate) as usize;
+        let mut samples = Vec::new();
+        // First sample at which each order entry started playing.
+        let mut entered: Vec<Option<usize>> = vec![None; order_count];
+        while samples.len() < max {
+            let s = chip.next_sample();
+            if let Some(row) = chip.player.take_row_started() {
+                if chip.player.loops() > 0 {
+                    // This sample begins the second time through; the loop ends before it.
+                    let loop_start = entered[row.order].unwrap_or(0);
+                    return Rendered {
+                        samples,
+                        loop_start,
+                        looped: true,
+                    };
+                }
+                entered[row.order].get_or_insert(samples.len());
+            }
+            samples.push(s);
+        }
+        Rendered {
+            samples,
+            loop_start: 0,
+            looped: false,
+        }
+    }
+
     /// The last [`SCOPE_LEN`] raw levels (0..=1) of a channel, oldest first.
     pub fn scope(&mut self, channel: usize) -> &[f32] {
         let ring = &self.scope[channel.min(CHANNELS - 1)];
@@ -236,7 +194,8 @@ impl Chip {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::song::demo;
+    use crate::tracker::tests::song_with;
+    use crate::tracker::{Cell, Instrument, Macro};
 
     const SR: f32 = 48_000.0;
 
@@ -255,21 +214,41 @@ mod tests {
         (x.iter().map(|v| v * v).sum::<f32>() / x.len() as f32).sqrt()
     }
 
-    #[test]
-    fn silent_until_played() {
-        let mut chip = Chip::new(SR);
-        chip.load_song(demo());
-        let out = render_seconds(&mut chip, 0.25);
-        assert!(out.iter().all(|&v| v.abs() < 1e-6));
+    /// Four bars of every channel playing, so mixing and muting have something to do.
+    fn busy_song() -> Song {
+        let mut cells = Vec::new();
+        for row in (0..64).step_by(4) {
+            cells.push((row, 0, Cell::note(72 + (row % 12) as u8, 0)));
+            cells.push((row, 1, Cell::note(64, 0)));
+            cells.push((row, 2, Cell::note(45, 0)));
+            cells.push((row, 3, Cell::note(8 + (row % 3) as u8, 0)));
+        }
+        song_with(
+            &cells,
+            Instrument {
+                volume: Macro::new(&[15, 12, 9, 7, 5]),
+                ..Default::default()
+            },
+        )
     }
 
     #[test]
-    fn demo_loop_is_audible_and_in_range() {
+    fn silent_until_played() {
         let mut chip = Chip::new(SR);
-        chip.load_song(demo());
-        chip.play();
-        // 64 sixteenths at 140 BPM ≈ 6.86 s: render a bit more than one loop.
-        let out = render_seconds(&mut chip, 7.5);
+        chip.load_song(busy_song());
+        assert!(
+            render_seconds(&mut chip, 0.25)
+                .iter()
+                .all(|&v| v.abs() < 1e-6)
+        );
+    }
+
+    #[test]
+    fn song_is_audible_and_in_range() {
+        let mut chip = Chip::new(SR);
+        chip.load_song(busy_song());
+        chip.play_from(0, 0);
+        let out = render_seconds(&mut chip, 2.0);
         assert!(out.iter().all(|v| v.is_finite() && v.abs() <= 1.0));
         assert!(rms(&out) > 0.05, "rms {}", rms(&out));
     }
@@ -278,53 +257,51 @@ mod tests {
     fn rendering_is_deterministic() {
         let run = || {
             let mut chip = Chip::new(SR);
-            chip.load_song(demo());
-            chip.play();
-            render_seconds(&mut chip, 2.0)
+            chip.load_song(busy_song());
+            chip.play_from(0, 0);
+            render_seconds(&mut chip, 1.0)
         };
         assert_eq!(run(), run());
     }
 
     #[test]
-    fn step_timing_follows_bpm() {
+    fn muting_all_channels_silences_output_but_not_scopes() {
         let mut chip = Chip::new(SR);
-        chip.load_song(demo());
-        chip.set_bpm(120.0);
-        chip.play();
-        // 120 BPM, 4 steps per beat → 6000 samples per step.
-        chip.render(1);
-        assert_eq!(chip.current_step(), Some(0));
-        chip.render(4096);
-        chip.render(5999 - 4096);
-        assert_eq!(chip.current_step(), Some(0));
-        chip.render(1);
-        assert_eq!(chip.current_step(), Some(1));
-    }
-
-    #[test]
-    fn muting_all_channels_silences_output() {
-        let mut chip = Chip::new(SR);
-        chip.load_song(demo());
+        chip.load_song(busy_song());
         for ch in 0..CHANNELS {
             chip.set_muted(ch, true);
         }
-        chip.play();
-        let out = render_seconds(&mut chip, 1.0);
-        assert!(rms(&out) < 1e-4);
-        // Scopes still show what each channel is doing while muted.
+        chip.play_from(0, 0);
+        assert!(rms(&render_seconds(&mut chip, 1.0)) < 1e-4);
         assert!(chip.scope(0).iter().any(|&v| v > 0.0));
     }
 
     #[test]
-    fn stop_rewinds_to_start() {
+    fn preview_sounds_while_stopped() {
         let mut chip = Chip::new(SR);
-        chip.load_song(demo());
-        chip.play();
-        render_seconds(&mut chip, 1.0);
-        chip.stop();
-        assert_eq!(chip.current_step(), None);
-        chip.play();
-        chip.render(1);
-        assert_eq!(chip.current_step(), Some(0));
+        chip.player_mut().preview(0, 69, 0);
+        assert!(rms(&render_seconds(&mut chip, 0.2)) > 0.05);
+    }
+
+    #[test]
+    fn render_song_stops_at_the_loop_and_reports_its_start() {
+        let mut song = busy_song();
+        song.patterns.push(song.patterns[0].clone());
+        song.order = vec![0, 1];
+        song.loop_point = 1;
+        // 150 BPM, 4 rows/beat: 64 rows = 6.4 s per pattern.
+        let r = Chip::render_song(song, SR);
+        assert!(r.looped);
+        let pattern = 6.4 * SR;
+        assert!(
+            (r.samples.len() as f32 - 2.0 * pattern).abs() < 2.0,
+            "{}",
+            r.samples.len()
+        );
+        assert!(
+            (r.loop_start as f32 - pattern).abs() < 2.0,
+            "{}",
+            r.loop_start
+        );
     }
 }

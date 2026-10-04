@@ -2,7 +2,7 @@
 
 import type { FromWorklet, ToWorklet } from './protocol'
 import { FRAME_INTERVAL } from './protocol'
-import type { ChipExports } from './chip-wasm'
+import { unpackPosition, withBytes, type ChipExports } from './chip-wasm'
 
 declare const sampleRate: number
 declare function registerProcessor(name: string, ctor: unknown): void
@@ -20,7 +20,6 @@ class ChipProcessor extends AudioWorkletProcessor {
     const instance = new WebAssembly.Instance(options.processorOptions.module, {})
     this.wasm = instance.exports as unknown as ChipExports
     this.chip = this.wasm.chip_new(sampleRate)
-    this.wasm.chip_load_demo(this.chip)
     this.port.onmessage = (e: MessageEvent<ToWorklet>) => this.handle(e.data)
     this.post({ type: 'ready' })
   }
@@ -32,18 +31,23 @@ class ChipProcessor extends AudioWorkletProcessor {
   private handle(msg: ToWorklet) {
     const { wasm, chip } = this
     switch (msg.type) {
+      case 'song': {
+        const code = withBytes(wasm, msg.bytes, (ptr, len) => wasm.chip_load_song(chip, ptr, len))
+        if (code !== 0) this.post({ type: 'songError', code })
+        return
+      }
       case 'play':
-        return wasm.chip_play(chip)
+        return wasm.chip_play_from(chip, msg.order, msg.row)
       case 'stop':
         return wasm.chip_stop(chip)
-      case 'bpm':
-        return wasm.chip_set_bpm(chip, msg.bpm)
+      case 'loopPattern':
+        return wasm.chip_set_loop_pattern(chip, msg.on ? 1 : 0)
       case 'mute':
         return wasm.chip_set_muted(chip, msg.channel, msg.muted ? 1 : 0)
-      case 'noteOn':
-        return wasm.chip_note_on(chip, msg.channel, msg.note, msg.volume)
-      case 'noteOff':
-        return wasm.chip_note_off(chip, msg.channel)
+      case 'preview':
+        return wasm.chip_preview(chip, msg.channel, msg.note, msg.instrument)
+      case 'previewOff':
+        return wasm.chip_preview_off(chip, msg.channel)
     }
   }
 
@@ -55,7 +59,7 @@ class ChipProcessor extends AudioWorkletProcessor {
       new Float32Array(wasm.memory.buffer, wasm.chip_scope(chip, ch), len).slice(),
     )
     this.post(
-      { type: 'frame', step: wasm.chip_current_step(chip), scopes },
+      { type: 'frame', position: unpackPosition(wasm.chip_position(chip)), scopes },
       scopes.map((s) => s.buffer),
     )
   }

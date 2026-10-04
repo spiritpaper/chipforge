@@ -1,23 +1,18 @@
 // Messages between the main thread and the chip AudioWorklet.
 
 export type ToWorklet =
-  | { type: 'play' }
+  | { type: 'song'; bytes: Uint8Array<ArrayBuffer> }
+  | { type: 'play'; order: number; row: number }
   | { type: 'stop' }
-  | { type: 'bpm'; bpm: number }
+  | { type: 'loopPattern'; on: boolean }
   | { type: 'mute'; channel: number; muted: boolean }
-  | { type: 'noteOn'; channel: number; note: number; volume: number }
-  | { type: 'noteOff'; channel: number }
+  | { type: 'preview'; channel: number; note: number; instrument: number }
+  | { type: 'previewOff'; channel: number }
 
 export type FromWorklet =
   | { type: 'ready' }
-  | { type: 'frame'; step: number; scopes: Float32Array[] }
-
-/** Encoded song cells, as returned by `chip_cell`. */
-export const CELL_HOLD = -1
-export const CELL_OFF = -2
-export const CELL_KICK = 128
-export const CELL_SNARE = 129
-export const CELL_HAT = 130
+  | { type: 'songError'; code: number }
+  | { type: 'frame'; position: { order: number; row: number } | null; scopes: Float32Array[] }
 
 /** How many rendered samples between scope/playhead updates (≈47 per second at 48 kHz). */
 export const FRAME_INTERVAL = 1024

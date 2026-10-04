@@ -15,7 +15,7 @@ emulated NES chip with live per-channel scopes.
 
 | Path | What |
 |------|------|
-| `core/` | `chipcore`: the Rust sound chip (2 pulse, triangle, noise, APU mixer, sequencer). Builds natively and to WASM. |
+| `core/` | `chipcore`: the Rust sound chip (2 pulse, triangle, noise, APU mixer), tracker sequencer and SFX synth. Builds natively and to WASM. |
 | `web/` | Svelte 5 + Vite app. `src/audio/` hosts the chip in an AudioWorklet. |
 | `api/` | FastAPI service. It's a stub for now; conversion jobs arrive in Phase 3. |
 | `docs/` | Plan and design system. |
@@ -32,7 +32,7 @@ pnpm install
 pnpm dev              # builds the WASM core, then starts the app at http://localhost:5173
 pnpm test             # Rust, web and API tests
 
-cd core && cargo run --release --example render_demo -- demo.wav   # render the demo offline
+cd core && cargo run --release --example render_song -- song.cfs song.wav   # render a song offline
 cd api && uv run uvicorn app.main:app --reload                     # run the API
 ```
 
