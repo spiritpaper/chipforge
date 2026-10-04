@@ -5,6 +5,12 @@
   import { download } from '../../sfx/export'
   import { slugify } from '../../sfx/library-core'
   import { toast } from '../../lib/toast.svelte'
+  import { loadChipModule } from '../../audio/wasm'
+  import { encodeSong } from '../../song/encode'
+  import RenderWorker from '../../export/render-worker.ts?worker'
+  import type { RenderRequest, RenderResponse } from '../../export/render-worker'
+  import type { AudioFormat, Ending } from '../../export/audio'
+  import { readPref, writePref } from '../../lib/prefs'
 
   let { open = $bindable(false) }: { open: boolean } = $props()
   let dialog: HTMLDialogElement
@@ -16,9 +22,63 @@
 
   const base = $derived(slugify(composer.song.title))
 
+  let format = $state<AudioFormat>(readPref('export.format') === 'ogg' ? 'ogg' : 'wav')
+  let ending = $state<Ending>(readPref('export.ending') === 'fade' ? 'fade' : 'loop')
+  let sampleRate = $state(Number(readPref('export.rate')) === 48_000 ? 48_000 : 44_100)
+  let busy = $state(false)
+  let result = $state<string | null>(null)
+
+  const time = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+
+  async function exportAudio() {
+    writePref('export.format', format)
+    writePref('export.ending', ending)
+    writePref('export.rate', String(sampleRate))
+    busy = true
+    result = null
+    const worker = new RenderWorker()
+    try {
+      const request: RenderRequest = {
+        module: await loadChipModule(),
+        song: encodeSong(composer.song),
+        title: composer.song.title,
+        sampleRate,
+        format,
+        ending,
+      }
+      const reply = await new Promise<RenderResponse>((resolve) => {
+        worker.onmessage = (e: MessageEvent<RenderResponse>) => resolve(e.data)
+        worker.onerror = () => resolve({ ok: false, error: 'The renderer stopped unexpectedly.' })
+        worker.postMessage(request, [request.song.buffer])
+      })
+      if (!reply.ok) {
+        result = `Export failed: ${reply.error}`
+        return
+      }
+      const file = `${base}.${format}`
+      download(reply.bytes, file, format === 'wav' ? 'audio/wav' : 'audio/ogg')
+      const loopNote =
+        ending === 'fade'
+          ? 'with a faded ending'
+          : reply.loopStartSeconds !== null
+            ? `looping from ${time(reply.loopStartSeconds)}`
+            : 'with no loop points: the song never loops back within 10 minutes'
+      result = `Saved ${file}: ${time(reply.seconds)}, ${loopNote}.`
+      toast.show(`Saved ${file}`)
+    } finally {
+      worker.terminate()
+      busy = false
+    }
+  }
+
   function exportMidi() {
     download(writeMidi(songToMidi(composer.song)), `${base}.mid`, 'audio/midi')
     toast.show(`Saved ${base}.mid`)
+  }
+
+  function exportSongFile() {
+    download(JSON.stringify(composer.song), `${base}.chipsong.json`, 'application/json')
+    toast.show(`Saved ${base}.chipsong.json`)
   }
 </script>
 
@@ -28,16 +88,52 @@
     <button class="key" onclick={() => (open = false)}>Close</button>
   </header>
 
+  <section aria-labelledby="audio-title">
+    <h3 id="audio-title">Audio</h3>
+    <fieldset>
+      <legend>Format</legend>
+      <label><input type="radio" bind:group={format} value="wav" /> WAV <span class="note">lossless, largest</span></label>
+      <label><input type="radio" bind:group={format} value="ogg" /> OGG Vorbis <span class="note">about a sixth the size</span></label>
+    </fieldset>
+    <fieldset>
+      <legend>Ending</legend>
+      <label>
+        <input type="radio" bind:group={ending} value="loop" /> Loop for games
+        <span class="note">Stops where the song loops back, with loop points that Godot, Unity, FMOD and RPG Maker read.</span>
+      </label>
+      <label>
+        <input type="radio" bind:group={ending} value="fade" /> Fade out for listening
+        <span class="note">Plays the looping part once more and fades out.</span>
+      </label>
+    </fieldset>
+    <label class="inline">
+      Sample rate
+      <select bind:value={sampleRate}>
+        <option value={44_100}>44.1 kHz</option>
+        <option value={48_000}>48 kHz</option>
+      </select>
+    </label>
+    <button class="key" onclick={exportAudio} disabled={busy}>{busy ? 'Rendering…' : `Download ${base}.${format}`}</button>
+    {#if result}<p class="result" role="status">{result}</p>{/if}
+  </section>
+
   <section>
     <h3>MIDI file</h3>
     <p>Notes and tempo for other music software. Instrument sounds and effects are not part of MIDI; the noise channel becomes General MIDI drums.</p>
     <button class="key" onclick={exportMidi}>Download {base}.mid</button>
+  </section>
+
+  <section>
+    <h3>Song file</h3>
+    <p>The whole song for ChipForge: a backup, or a way to move it to another browser. Open it from Songs.</p>
+    <button class="key" onclick={exportSongFile}>Download {base}.chipsong.json</button>
   </section>
 </dialog>
 
 <style>
   dialog {
     width: min(560px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
     padding: calc(var(--u) * 6);
     border: 1px solid var(--line);
     border-radius: var(--radius-key);
@@ -79,5 +175,56 @@
   p {
     color: var(--muted);
     max-width: 60ch;
+  }
+
+  fieldset {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--u) * 2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  legend {
+    margin-bottom: var(--u);
+    color: var(--muted);
+  }
+
+  fieldset label {
+    display: block;
+    padding-left: calc(var(--u) * 6);
+    text-indent: calc(var(--u) * -6);
+  }
+
+  input[type='radio'] {
+    accent-color: var(--text);
+  }
+
+  .note {
+    display: block;
+    text-indent: 0;
+    color: var(--muted);
+    font-size: var(--step--1);
+  }
+
+  .inline {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 2);
+    color: var(--muted);
+  }
+
+  select {
+    padding: var(--u) calc(var(--u) * 2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-key);
+    background: var(--ink);
+    font: inherit;
+    color: var(--text);
+  }
+
+  .result {
+    color: var(--text);
   }
 </style>

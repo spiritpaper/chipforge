@@ -2,6 +2,7 @@
   import { composer } from '../../composer/composer.svelte'
   import { MidiError, parseMidi } from '../../midi/smf'
   import { midiToSong, type ImportReport } from '../../midi/convert'
+  import { validateSong } from '../../song/validate'
 
   let { open = $bindable(false) }: { open: boolean } = $props()
 
@@ -11,8 +12,22 @@
   let importError = $state<string | null>(null)
   let fileInput: HTMLInputElement
 
-  async function importMidi(file: File) {
+  async function importFile(file: File) {
     importError = null
+    if (/\.json$/i.test(file.name)) {
+      let song = null
+      try {
+        song = validateSong(JSON.parse(await file.text()))
+      } catch {
+        // Reported below.
+      }
+      if (song) {
+        await composer.create(song)
+        report = { title: song.title, lines: ['Opened as a new song; the original file is unchanged.'] }
+      } else importError = 'That file is not a ChipForge song, or it is damaged.'
+      fileInput.value = ''
+      return
+    }
     try {
       const title = file.name.replace(/\.midi?$/i, '') || 'Imported song'
       const { song, report: r } = midiToSong(parseMidi(new Uint8Array(await file.arrayBuffer())), title)
@@ -48,8 +63,8 @@
 
   <div class="new-row">
     <button class="key" onclick={async () => { await composer.create(); open = false }}>New empty song</button>
-    <button class="key" onclick={() => fileInput.click()}>From a MIDI file…</button>
-    <input bind:this={fileInput} type="file" accept=".mid,.midi,audio/midi" hidden onchange={(e) => e.currentTarget.files?.[0] && importMidi(e.currentTarget.files[0])} />
+    <button class="key" onclick={() => fileInput.click()}>Open a MIDI or song file…</button>
+    <input bind:this={fileInput} type="file" accept=".mid,.midi,audio/midi,.json,application/json" hidden onchange={(e) => e.currentTarget.files?.[0] && importFile(e.currentTarget.files[0])} />
   </div>
 
   {#if importError}
