@@ -117,11 +117,6 @@ class ChipEngine {
     this.send({ type: 'stop' })
   }
 
-  async togglePlay(order = 0, row = 0) {
-    if (this.playing) this.stop()
-    else await this.play(order, row)
-  }
-
   setLoopPattern(on: boolean) {
     this.loopPattern = on
     this.send({ type: 'loopPattern', on })

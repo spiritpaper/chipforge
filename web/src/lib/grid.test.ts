@@ -32,7 +32,8 @@ import { parseHash } from './hash'
 describe('parseHash', () => {
   it('defaults to the SFX Lab and reads share codes', () => {
     expect(parseHash('')).toEqual({ mode: 'sfx', share: null })
-    expect(parseHash('#/demo')).toEqual({ mode: 'demo', share: null })
+    expect(parseHash('#/compose')).toEqual({ mode: 'compose', share: null })
+    expect(parseHash('#/demo')).toEqual({ mode: 'compose', share: null })
     expect(parseHash('#/sfx?s=AbC_-1')).toEqual({ mode: 'sfx', share: 'AbC_-1' })
   })
 })

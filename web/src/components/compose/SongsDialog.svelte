@@ -3,6 +3,7 @@
   import { MidiError, parseMidi } from '../../midi/smf'
   import { midiToSong, type ImportReport } from '../../midi/convert'
   import { validateSong } from '../../song/validate'
+  import { TEMPLATES } from '../../song/templates'
 
   let { open = $bindable(false) }: { open: boolean } = $props()
 
@@ -56,13 +57,23 @@
 
 <dialog bind:this={dialog} onclose={() => ((open = false), (confirmDelete = null), (report = null), (importError = null))} aria-labelledby="songs-title">
   <header>
-    <h2 id="songs-title">Your songs</h2>
+    <h2 id="songs-title">Songs</h2>
     <button class="key" onclick={() => (open = false)}>Close</button>
   </header>
   <p class="note">Songs save automatically in this browser.</p>
 
+  <h3>Start a new song</h3>
+  <ul class="templates">
+    {#each TEMPLATES as t (t.id)}
+      <li>
+        <button onclick={async () => { await composer.create(t.create()); open = false }}>
+          <span class="title">{t.title}</span>
+          <span class="when">{t.description}</span>
+        </button>
+      </li>
+    {/each}
+  </ul>
   <div class="new-row">
-    <button class="key" onclick={async () => { await composer.create(); open = false }}>New empty song</button>
     <button class="key" onclick={() => fileInput.click()}>Open a MIDI or song file…</button>
     <input bind:this={fileInput} type="file" accept=".mid,.midi,audio/midi,.json,application/json" hidden onchange={(e) => e.currentTarget.files?.[0] && importFile(e.currentTarget.files[0])} />
   </div>
@@ -78,7 +89,8 @@
     </div>
   {/if}
 
-  <ul>
+  <h3>Your songs</h3>
+  <ul class="projects">
     {#each composer.projects as p (p.id)}
       <li class:current={p.id === composer.projectId}>
         <button class="open" onclick={() => pick(p.id)} aria-current={p.id === composer.projectId ? 'true' : undefined}>
@@ -128,6 +140,40 @@
     color: var(--muted);
   }
 
+  h3 {
+    margin: calc(var(--u) * 4) 0 calc(var(--u) * 2);
+    font-size: var(--step-0);
+    font-weight: 600;
+  }
+
+  .templates {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: calc(var(--u) * 2);
+    margin: 0 0 calc(var(--u) * 3);
+    padding: 0;
+    list-style: none;
+  }
+
+  .templates button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--u);
+    width: 100%;
+    height: 100%;
+    padding: calc(var(--u) * 3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-key);
+    background: var(--panel);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .templates button:hover {
+    border-color: var(--muted);
+  }
+
   .new-row {
     display: flex;
     flex-wrap: wrap;
@@ -153,8 +199,8 @@
     list-style: disc;
   }
 
-  ul {
-    margin: calc(var(--u) * 4) 0 0;
+  .projects {
+    margin: 0;
     padding: 0;
     list-style: none;
     display: flex;
@@ -162,14 +208,14 @@
     gap: var(--u);
   }
 
-  li {
+  .projects li {
     display: flex;
     align-items: center;
     gap: var(--u);
     border-radius: var(--radius-key);
   }
 
-  li.current {
+  .projects li.current {
     background: var(--panel);
   }
 

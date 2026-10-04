@@ -68,7 +68,7 @@ under the waveform makes slides and jumps visible.
 
 ---
 
-## Phase 2 — Composer (4–6 weeks)
+## Phase 2 — Composer (4–6 weeks) — built
 
 Goal: write a full looping game track in a tracker *or* a piano roll, on the same data.
 
@@ -92,6 +92,19 @@ Goal: write a full looping game track in a tracker *or* a piano roll, on the sam
    WAV/OGG render (offline, faster than real time in a Worker), loop-aware OGG.
 10. **Starter templates**: "Overworld", "Dungeon", "Boss", "Victory jingle" — a blank
     page is the hardest part for newcomers.
+
+As built, also:
+- The song engine follows FamiTracker semantics (rows × speed ticks, effects 0 1 2 3
+  4 A B D F S V, macros with loop and release) so tracker users feel at home.
+- Instruments edit in plain words: Volume, Tone, Bend, Chord.
+- Export renders in a Web Worker; WAV gets a `smpl` loop chunk and OGG gets
+  LOOPSTART/LOOPLENGTH tags, which most engines read. Songs also export as MIDI and
+  as `.chipsong.json` files for backup.
+- MIDI import maps the three busiest parts to lead, harmony and bass, channel 10 to
+  drums, and stores repeated sections once.
+- Sound check (the Phase 0 demo) was retired; its song is a template now.
+- Not done: Speed changes per pattern use the F effect rather than a UI control;
+  real-time MIDI recording writes to the row playing now (no swing/quantize options).
 
 ---
 

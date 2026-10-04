@@ -2,15 +2,13 @@
   import { untrack } from 'svelte'
   import { engine } from './audio/engine.svelte'
   import { CHANNELS } from './audio/channels'
-  import { isTypingTarget, sfxShortcut, songShortcut } from './lib/keys'
+  import { isTypingTarget, sfxShortcut } from './lib/keys'
   import { route } from './lib/route.svelte'
   import { lab } from './sfx/lab.svelte'
-  import { demo } from './lib/demo.svelte'
   import { composer } from './composer/composer.svelte'
   import ComposeView from './components/compose/ComposeView.svelte'
   import ModeRail from './components/ModeRail.svelte'
   import Transport from './components/Transport.svelte'
-  import SongView from './components/SongView.svelte'
   import ChannelStrip from './components/ChannelStrip.svelte'
   import SfxLab from './components/sfx/SfxLab.svelte'
   import Toast from './components/Toast.svelte'
@@ -26,14 +24,8 @@
     const mode = route.mode
     untrack(() => {
       engine.stop()
-      if (mode === 'demo') engine.setSong(demo.song)
       if (mode === 'compose') void composer.init().then(() => engine.setSong(composer.song))
     })
-  })
-
-  // Sound check's tempo control edits its song; the Composer pushes its own edits.
-  $effect(() => {
-    if (route.mode === 'demo') engine.setSong(demo.song)
   })
 
   function onHashChange() {
@@ -69,16 +61,6 @@
       return
     }
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target, e.code)) return
-    if (route.mode === 'demo') {
-      const shortcut = songShortcut(e.code, e.shiftKey)
-      if (!shortcut) return
-      // Stop Space from also "clicking" whichever button has focus.
-      e.preventDefault()
-      if (shortcut.action === 'togglePlay') engine.togglePlay()
-      else if (shortcut.action === 'mute') engine.toggleMute(shortcut.channel)
-      else engine.toggleSolo(shortcut.channel)
-      return
-    }
 
     const shortcut = sfxShortcut(e.code, e.shiftKey)
     if (!shortcut || lab.status !== 'ready') return
@@ -109,8 +91,8 @@
 <div class="shell" data-mode={route.mode}>
   <ModeRail current={route.mode} />
   <Transport mode={route.mode} />
-  {#if route.mode === 'demo' || route.mode === 'compose'}
-    {#if route.mode === 'demo'}<SongView />{:else}<ComposeView />{/if}
+  {#if route.mode === 'compose'}
+    <ComposeView />
     <section class="strips" aria-label="Chip channels">
       {#each CHANNELS as info, channel (info.name)}
         <ChannelStrip {channel} {info} />

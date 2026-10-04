@@ -6,16 +6,22 @@ for your games.
 - [Product & build plan](docs/PLAN.md)
 - [Design system](docs/DESIGN.md)
 
-**Status:** Phase 1 is done. **SFX Lab** makes game sound effects: ten seeded presets plus
-random, mutate, fine-tune sliders, a history with kept sounds, WAV and zip export,
-share links, and offline use. **Sound check** (from Phase 0) plays a demo song on the
-emulated NES chip with live per-channel scopes.
+**Status:** Phase 2 is done.
+
+- **SFX Lab** makes game sound effects: ten seeded presets plus random, mutate,
+  fine-tune sliders, a history with kept sounds, WAV and zip export, share links.
+- **Compose** writes chiptune songs on the emulated NES chip: a tracker and a piano
+  roll on the same patterns, instruments with drawable volume/tone/bend/chord
+  macros, a song-order strip, undo, autosave, starter templates, MIDI keyboard
+  input, MIDI import/export, and WAV/OGG export with loop points for game engines.
+
+Everything runs in the browser and works offline after the first visit.
 
 ## Layout
 
 | Path | What |
 |------|------|
-| `core/` | `chipcore`: the Rust sound chip (2 pulse, triangle, noise, APU mixer), tracker sequencer and SFX synth. Builds natively and to WASM. |
+| `core/` | `chipcore`: the Rust sound chip (2 pulse, triangle, noise, APU mixer), tracker sequencer (`tracker.rs`, which also documents the song binary format) and SFX synth. Builds natively and to WASM. |
 | `web/` | Svelte 5 + Vite app. `src/audio/` hosts the chip in an AudioWorklet. |
 | `api/` | FastAPI service. It's a stub for now; conversion jobs arrive in Phase 3. |
 | `docs/` | Plan and design system. |
@@ -32,7 +38,7 @@ pnpm install
 pnpm dev              # builds the WASM core, then starts the app at http://localhost:5173
 pnpm test             # Rust, web and API tests
 
-cd core && cargo run --release --example render_song -- song.cfs song.wav   # render a song offline
+cd core && cargo run --release --example render_song -- song.cfs song.wav   # render an encoded song offline
 cd api && uv run uvicorn app.main:app --reload                     # run the API
 ```
 
@@ -52,10 +58,20 @@ SFX Lab:
 | F | Show or hide fine-tune |
 | ↑ / ↓ | Move through history |
 
-Sound check:
+Compose (tracker focused):
 
 | Key | Action |
 |-----|--------|
-| Space | Play / stop |
-| 1–4 | Mute a channel |
-| Shift+1–4 | Solo a channel |
+| Z–M, Q–P (and the number row for sharps) | Enter notes: two octaves of piano |
+| 1 / = | Note off / release |
+| 0–9, A–F | Instrument, volume and effect values |
+| [ ] | Octave down / up |
+| , . | Previous / next instrument |
+| Arrows, Tab, PageUp/Down, Home/End | Move (Shift+arrows selects) |
+| Ctrl+C / X / V, Ctrl+A | Copy, cut, paste, select channel/pattern |
+| Ctrl+↑/↓ (Shift for octaves) | Transpose |
+| Insert / Backspace / Delete | Insert row / delete row / clear |
+| Enter | Play from the cursor |
+
+Anywhere in Compose: Space plays or stops, Ctrl+Z / Ctrl+Shift+Z undo and redo,
+and ` switches between tracker and piano roll.

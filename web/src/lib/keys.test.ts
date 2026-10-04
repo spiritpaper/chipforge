@@ -1,16 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { isTypingTarget, sfxShortcut, songShortcut } from './keys'
+import { isTypingTarget, sfxShortcut } from './keys'
 import { soloMask } from './mix'
-
-describe('songShortcut', () => {
-  it('maps space, digits and shift+digits', () => {
-    expect(songShortcut('Space', false)).toEqual({ action: 'togglePlay' })
-    expect(songShortcut('Digit3', false)).toEqual({ action: 'mute', channel: 2 })
-    expect(songShortcut('Digit1', true)).toEqual({ action: 'solo', channel: 0 })
-    expect(songShortcut('Digit5', false)).toBeNull()
-    expect(songShortcut('KeyA', false)).toBeNull()
-  })
-})
 
 describe('sfxShortcut', () => {
   it('maps number keys to presets and letters to actions', () => {

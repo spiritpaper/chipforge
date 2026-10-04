@@ -35,12 +35,17 @@ export function parseTrack(src: string, instrument: number, drums: Drums = {}): 
     })
 }
 
-/** A pattern from four tracks; shorter tracks are padded with empty rows. */
-export function buildPattern(length: number, tracks: Cell[][]): { channels: Cell[][] } {
+/**
+ * A pattern from four tracks; shorter tracks are padded with empty rows unless
+ * `strict`, which demands every track fill the pattern exactly (catches miscounts).
+ */
+export function buildPattern(length: number, tracks: Cell[][], strict = false): { channels: Cell[][] } {
   return {
     channels: Array.from({ length: CHANNEL_COUNT }, (_, ch) => {
       const cells = tracks[ch] ?? []
-      if (cells.length > length) throw new Error(`Track ${ch} has ${cells.length} rows, pattern has ${length}`)
+      if (cells.length > length || (strict && cells.length !== length)) {
+        throw new Error(`Track ${ch} has ${cells.length} rows, pattern has ${length}`)
+      }
       return [...cells, ...Array<Cell>(length - cells.length).fill(EMPTY_CELL)]
     }),
   }

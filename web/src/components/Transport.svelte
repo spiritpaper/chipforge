@@ -3,7 +3,6 @@
   import PixelIcon from './PixelIcon.svelte'
   import type { Mode } from '../lib/hash'
   import { lab } from '../sfx/lab.svelte'
-  import { demo } from '../lib/demo.svelte'
   import { composer } from '../composer/composer.svelte'
 
   let { mode }: { mode: Mode } = $props()
@@ -68,38 +67,8 @@
         onchange={(e) => composer.setSpeed(e.currentTarget.valueAsNumber)}
       />
     </div>
-  {:else}
-    <button
-      class="key play"
-      onclick={() => engine.togglePlay()}
-      aria-pressed={engine.playing}
-      disabled={engine.status === 'loading'}
-      title="Play or stop (Space)"
-    >
-      <PixelIcon name={engine.playing ? 'stop' : 'play'} />
-      <span>{engine.playing ? 'Stop' : 'Play'}</span>
-      <kbd>Space</kbd>
-    </button>
   {/if}
 
-  {#if mode === 'demo'}
-  <div class="field">
-    <label for="bpm">Tempo</label>
-    <div class="stepper">
-      <button class="key small" onclick={() => demo.setBpm(demo.song.bpm - 1)} aria-label="Slower">−</button>
-      <input
-        id="bpm"
-        type="number"
-        min="30"
-        max="300"
-        value={demo.song.bpm}
-        onchange={(e) => demo.setBpm(e.currentTarget.valueAsNumber)}
-      />
-      <button class="key small" onclick={() => demo.setBpm(demo.song.bpm + 1)} aria-label="Faster">+</button>
-    </div>
-    <span class="unit">BPM</span>
-  </div>
-  {/if}
 
   <div class="field">
     <label for="volume"><PixelIcon name="volume" /><span class="visually-hidden">Volume</span></label>
@@ -154,17 +123,6 @@
 
   .field label {
     display: flex;
-  }
-
-  .stepper {
-    display: flex;
-    align-items: center;
-    gap: var(--u);
-  }
-
-  .small {
-    min-width: 32px;
-    padding: 0;
   }
 
   input[type='number'] {

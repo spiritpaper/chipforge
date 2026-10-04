@@ -60,7 +60,7 @@ everywhere. Don't use all-caps labels.
 - **Mode rail (left)**: SFX Lab, Compose, Convert, Library. Each has an icon and a
   text label.
 - **Transport (top)**: the same play/stop/tempo for every mode.
-- **Channel strip (bottom)**: visible in modes that play songs (Sound check, Compose),
+- **Channel strip (bottom)**: visible in Compose,
   so you always see what the chip is doing. Mute and Solo buttons on each strip
   (`1–4`, `Shift+1–4`). SFX Lab hides it: one sound has one voice, shown large instead.
 - On mobile, the rail becomes a bottom tab bar and the strips become a 2×2 grid.
@@ -84,6 +84,27 @@ grid unit is 4 px.
 
 The current sound's wave type sets its color (pulse pink, triangle cyan, noise
 lavender), and the same rule applies to history thumbnails.
+
+## Compose
+
+```
+┌ Title · Songs · Export · Tracker|Piano roll · Undo Redo · Rows · Octave · Step ┐
+│ Song order: [00 ▮▮▮][01 ▮▮ ×2][Loop▸02 ▮▮▮]  New · Duplicate · Repeat · ← → … │
+├───────────────────────────────────────────────┬────────────────────────────────┤
+│ 00  C-4 00 . ...  │ E-4 01 . 047 │ …           │ Instruments  [Add…]           │
+│ 01  ... .. . ...  │ ... .. . ... │             │ 00 Lead  01 Echo arp …        │
+│ (tracker, or piano roll for one channel)       │ Volume|Tone|Bend|Chord graph  │
+├───────────────────────────────────────────────┴────────────────────────────────┤
+│ channel strips with scopes                                                    │
+└────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- The tracker is the keyboard path (QWERTY piano, hex entry, selections); the piano
+  roll is the mouse and touch path. Both edit the same cells, and both are
+  accessible: the tracker announces the cursor cell, and roll notes are focusable.
+- Channel colors carry over to tracker columns, roll notes, ghost notes and the song
+  order previews. The noise channel writes its 16 sounds as `0-#` … `F-#`.
+- Destructive actions confirm in place with the consequence ("64 notes use it").
 
 ## Interaction principles
 

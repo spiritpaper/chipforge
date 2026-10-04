@@ -14,7 +14,6 @@
 
   const items: RailItem[] = [
     { label: 'SFX Lab', icon: 'spark', mode: 'sfx' },
-    { label: 'Sound check', icon: 'scope', mode: 'demo' },
     { label: 'Compose', icon: 'note', mode: 'compose' },
     { label: 'Convert', icon: 'convert', mode: null, comingIn: 'Phase 3' },
     { label: 'Library', icon: 'stack', mode: null, comingIn: 'Phase 5' },
