@@ -11,6 +11,7 @@ import {
   insertRow,
   normalizeRegion,
   pasteClip,
+  replaceChannel,
   resizePatterns,
   setNibble,
   transposeRegion,
@@ -18,7 +19,7 @@ import {
   type Clip,
   type Region,
 } from '../song/edit'
-import { CHANNEL_COUNT, LIMITS, NOTE_OFF, NOTE_RELEASE, emptySong, type Song } from '../song/model'
+import { CHANNEL_COUNT, LIMITS, NOTE_OFF, NOTE_RELEASE, emptySong, type Cell, type Song } from '../song/model'
 import { firstLight } from '../song/templates'
 import { COLUMNS, COLUMN_COUNT, type Column, type TrackerAction } from './keys'
 import { deleteProject, listProjects, loadProject, saveProject, type ProjectMeta } from './projects'
@@ -51,6 +52,7 @@ class Composer {
   step = $state(1)
   instrument = $state(0)
   follow = $state(readPref('compose.follow') !== 'off')
+  view = $state<'tracker' | 'roll'>(readPref('compose.view') === 'roll' ? 'roll' : 'tracker')
 
   private past: Song[] = []
   private future: Song[] = []
@@ -133,11 +135,16 @@ class Composer {
 
   // ---- history -------------------------------------------------------------
 
-  /** Replaces the song with an edited version, recording undo history. */
+  /**
+   * Replaces the song with an edited version, recording undo history. Edits sharing a
+   * key undo together: keys starting with "drag:" for the whole gesture, others when
+   * they come in quick succession (typing a tempo, nudging a value).
+   */
   commit(next: Song, coalesceKey?: string) {
     if (next === this.song) return
     const now = Date.now()
-    const coalesce = coalesceKey && this.lastEdit?.key === coalesceKey && now - this.lastEdit.time < COALESCE_MS
+    const sameKey = coalesceKey !== undefined && this.lastEdit?.key === coalesceKey
+    const coalesce = sameKey && (coalesceKey.startsWith('drag:') || now - this.lastEdit!.time < COALESCE_MS)
     if (!coalesce) {
       this.past.push(this.song)
       if (this.past.length > HISTORY_LIMIT) this.past.shift()
@@ -212,6 +219,16 @@ class Composer {
 
   setPatternLength(length: number) {
     this.commit(resizePatterns(this.song, length))
+  }
+
+  setView(view: 'tracker' | 'roll') {
+    this.view = view
+    writePref('compose.view', view)
+  }
+
+  /** Rewrites one channel of the current pattern (piano roll edits). */
+  editChannel(channel: number, cells: Cell[], coalesceKey?: string) {
+    this.commit(replaceChannel(this.song, this.patternIndex, channel, cells), coalesceKey)
   }
 
   setOctave(octave: number) {

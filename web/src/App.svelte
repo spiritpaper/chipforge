@@ -57,6 +57,10 @@
         return composer.redo()
       }
       if (mod || e.altKey || typing) return
+      if (e.code === 'Backquote') {
+        e.preventDefault()
+        return composer.setView(composer.view === 'tracker' ? 'roll' : 'tracker')
+      }
       if (e.code === 'Space') {
         e.preventDefault()
         composer.togglePlay()

@@ -16,6 +16,11 @@
   />
   <button class="key" onclick={() => (songsOpen = true)}>Songs</button>
 
+  <div class="views" role="radiogroup" aria-label="Editor view">
+    <button role="radio" aria-checked={composer.view === 'tracker'} onclick={() => composer.setView('tracker')} title="Tracker: type notes with the keyboard (`)">Tracker</button>
+    <button role="radio" aria-checked={composer.view === 'roll'} onclick={() => composer.setView('roll')} title="Piano roll: draw notes with the mouse (`)">Piano roll</button>
+  </div>
+
   <div class="group" role="group" aria-label="History">
     <button class="key" onclick={() => composer.undo()} disabled={!composer.canUndo} title="Undo (Ctrl+Z)">Undo</button>
     <button class="key" onclick={() => composer.redo()} disabled={!composer.canRedo} title="Redo (Ctrl+Shift+Z)">Redo</button>
@@ -82,6 +87,28 @@
   .title:focus {
     border-color: var(--muted);
     outline: none;
+  }
+
+  .views {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--radius-key);
+    background: var(--panel);
+  }
+
+  .views button {
+    padding: var(--u) calc(var(--u) * 3);
+    border: 0;
+    border-radius: 3px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .views button[aria-checked='true'] {
+    background: var(--line);
+    color: var(--text);
   }
 
   .group {

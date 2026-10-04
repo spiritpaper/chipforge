@@ -102,7 +102,7 @@ export function deleteRow(song: Song, patternIndex: number, channel: number, row
   return replaceChannel(song, patternIndex, channel, next)
 }
 
-function replaceChannel(song: Song, patternIndex: number, channel: number, cells: Cell[]): Song {
+export function replaceChannel(song: Song, patternIndex: number, channel: number, cells: Cell[]): Song {
   const channels = song.patterns[patternIndex].channels.slice()
   channels[channel] = cells
   return withPattern(song, patternIndex, { channels })

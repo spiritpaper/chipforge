@@ -4,6 +4,7 @@
   import ComposeToolbar from './ComposeToolbar.svelte'
   import InstrumentPanel from './InstrumentPanel.svelte'
   import TrackerGrid from './TrackerGrid.svelte'
+  import PianoRoll from './PianoRoll.svelte'
 
   // Follow playback into the next pattern.
   $effect(() => {
@@ -29,7 +30,7 @@
       </nav>
     </div>
     <div class="editor">
-      <TrackerGrid />
+      {#if composer.view === 'tracker'}<TrackerGrid />{:else}<PianoRoll />{/if}
       <InstrumentPanel />
     </div>
   {/if}
