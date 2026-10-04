@@ -233,6 +233,15 @@ class Composer {
     this.commit(replaceChannel(this.song, this.patternIndex, channel, cells), coalesceKey)
   }
 
+  /**
+   * Applies an arrangement edit and keeps the selection on a sensible entry:
+   * `select` is the order index to edit afterwards.
+   */
+  arrange(next: Song, select = this.orderIndex) {
+    this.commit(next)
+    this.goToOrder(select)
+  }
+
   setOctave(octave: number) {
     this.octave = Math.min(8, Math.max(0, octave))
     writePref('compose.octave', String(this.octave))

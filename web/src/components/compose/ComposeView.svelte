@@ -5,6 +5,7 @@
   import InstrumentPanel from './InstrumentPanel.svelte'
   import TrackerGrid from './TrackerGrid.svelte'
   import PianoRoll from './PianoRoll.svelte'
+  import ArrangementStrip from './ArrangementStrip.svelte'
 
   // Follow playback into the next pattern.
   $effect(() => {
@@ -12,7 +13,6 @@
     if (composer.follow && engine.playing && pos && pos.order !== composer.orderIndex) composer.goToOrder(pos.order)
   })
 
-  const hex = (i: number) => i.toString(16).toUpperCase().padStart(2, '0')
 </script>
 
 <div class="compose">
@@ -21,13 +21,7 @@
   {:else}
     <div class="top">
       <ComposeToolbar />
-      <nav class="orders" aria-label="Song order">
-        <button class="key small" onclick={() => composer.goToOrder(composer.orderIndex - 1)} disabled={composer.orderIndex === 0} aria-label="Previous pattern" title="Previous (Ctrl+←)">‹</button>
-        <span>
-          Pattern <span class="mono">{hex(composer.patternIndex)}</span>, part {composer.orderIndex + 1} of {composer.song.order.length}
-        </span>
-        <button class="key small" onclick={() => composer.goToOrder(composer.orderIndex + 1)} disabled={composer.orderIndex >= composer.song.order.length - 1} aria-label="Next pattern" title="Next (Ctrl+→)">›</button>
-      </nav>
+      <ArrangementStrip />
     </div>
     <div class="editor">
       {#if composer.view === 'tracker'}<TrackerGrid />{:else}<PianoRoll />{/if}
@@ -56,23 +50,6 @@
     gap: calc(var(--u) * 3);
     padding: calc(var(--u) * 4) calc(var(--u) * 6);
     border-bottom: 1px solid var(--line);
-  }
-
-  .orders {
-    display: flex;
-    align-items: center;
-    gap: calc(var(--u) * 2);
-    color: var(--muted);
-  }
-
-  .small {
-    min-width: 32px;
-    padding: 0;
-  }
-
-  .mono {
-    font-family: var(--font-data);
-    color: var(--text);
   }
 
   .editor {
