@@ -71,10 +71,10 @@ class ChipEngine {
         } else if (msg.type === 'songError') {
           this.error = `The song could not be loaded (code ${msg.code}).`
         } else {
-          this.position = msg.position
+          // Frames posted before a play/stop request was handled can still arrive, so
+          // `playing` only changes on request; a stale "stopped" frame is ignored.
+          if (this.playing) this.position = msg.position
           this.scopes = msg.scopes
-          // The sequencer only stops on request; this keeps state honest regardless.
-          if (!msg.position && this.playing) this.playing = false
         }
       }
     })

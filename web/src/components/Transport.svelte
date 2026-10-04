@@ -4,6 +4,7 @@
   import type { Mode } from '../lib/hash'
   import { lab } from '../sfx/lab.svelte'
   import { demo } from '../lib/demo.svelte'
+  import { composer } from '../composer/composer.svelte'
 
   let { mode }: { mode: Mode } = $props()
 
@@ -28,6 +29,45 @@
       <span>Play</span>
       <kbd>Space</kbd>
     </button>
+  {:else if mode === 'compose'}
+    <button
+      class="key play"
+      onclick={() => composer.togglePlay()}
+      aria-pressed={engine.playing}
+      disabled={engine.status === 'loading'}
+      title="Play from the start of this pattern, or stop (Space). Enter plays from the cursor."
+    >
+      <PixelIcon name={engine.playing ? 'stop' : 'play'} />
+      <span>{engine.playing ? 'Stop' : 'Play'}</span>
+      <kbd>Space</kbd>
+    </button>
+    <label class="field check" title="Repeat the pattern you're editing instead of playing the whole song">
+      <input type="checkbox" checked={engine.loopPattern} onchange={(e) => engine.setLoopPattern(e.currentTarget.checked)} />
+      Loop pattern
+    </label>
+    <div class="field">
+      <label for="bpm">Tempo</label>
+      <input
+        id="bpm"
+        type="number"
+        min="30"
+        max="300"
+        value={composer.song.bpm}
+        onchange={(e) => composer.setBpm(e.currentTarget.valueAsNumber)}
+      />
+      <span class="unit">BPM</span>
+    </div>
+    <div class="field" title="Ticks per row: lower is faster. Effects and instruments step once per tick.">
+      <label for="speed">Speed</label>
+      <input
+        id="speed"
+        type="number"
+        min="1"
+        max="31"
+        value={composer.song.speed}
+        onchange={(e) => composer.setSpeed(e.currentTarget.valueAsNumber)}
+      />
+    </div>
   {:else}
     <button
       class="key play"
@@ -137,6 +177,12 @@
     text-align: center;
     color: var(--text);
     appearance: textfield;
+  }
+
+  .check input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--text);
   }
 
   input[type='number']::-webkit-inner-spin-button {
