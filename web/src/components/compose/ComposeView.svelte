@@ -78,7 +78,7 @@
   .editor {
     flex: 1;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 240px;
+    grid-template-columns: minmax(0, 1fr) 300px;
     min-height: 0;
   }
 

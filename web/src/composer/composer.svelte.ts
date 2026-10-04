@@ -22,6 +22,8 @@ import {
 import { CHANNEL_COUNT, LIMITS, NOTE_OFF, NOTE_RELEASE, emptySong, type Cell, type Song } from '../song/model'
 import { firstLight } from '../song/templates'
 import { COLUMNS, COLUMN_COUNT, type Column, type TrackerAction } from './keys'
+import { addInstrument, deleteInstrument, updateInstrument, type MacroKind } from '../song/instrument-edit'
+import type { Instrument, Macro } from '../song/model'
 import { deleteProject, listProjects, loadProject, saveProject, type ProjectMeta } from './projects'
 
 export interface Cursor {
@@ -266,8 +268,46 @@ class Composer {
   }
 
   /** Sounds a note on the cursor's channel with the current instrument. */
-  preview(note: number, channel = this.cursor.channel) {
-    void engine.preview(channel, note, this.instrument)
+  preview(note: number, channel = this.cursor.channel, instrument = this.instrument) {
+    void engine.preview(channel, note, instrument)
+  }
+
+  private tryTimer: ReturnType<typeof setTimeout> | undefined
+
+  /** Plays a short test note with an instrument, then releases it. */
+  tryInstrument(index = this.instrument) {
+    const channel = this.cursor.channel
+    clearTimeout(this.tryTimer)
+    this.preview(channel === 3 ? 8 : 60, channel, index)
+    this.tryTimer = setTimeout(() => this.previewOff(channel), 500)
+  }
+
+  // ---- instruments -------------------------------------------------------
+
+  addInstrument(instrument: Instrument) {
+    const next = addInstrument(this.song, instrument)
+    if (next === this.song) return false
+    this.commit(next)
+    this.instrument = next.instruments.length - 1
+    return true
+  }
+
+  duplicateInstrument(index = this.instrument) {
+    const inst = this.song.instruments[index]
+    return this.addInstrument({ ...inst, name: `${inst.name} copy` })
+  }
+
+  deleteInstrument(index = this.instrument) {
+    this.commit(deleteInstrument(this.song, index))
+  }
+
+  renameInstrument(index: number, name: string) {
+    const n = name.trim()
+    if (n) this.commit(updateInstrument(this.song, index, { name: n }))
+  }
+
+  editMacro(index: number, kind: MacroKind, macro: Macro, coalesceKey?: string) {
+    this.commit(updateInstrument(this.song, index, { [kind]: macro }), coalesceKey)
   }
 
   previewOff(channel = this.cursor.channel) {
