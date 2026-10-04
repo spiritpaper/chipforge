@@ -3,6 +3,7 @@
 import { engine } from '../audio/engine.svelte'
 import { loadChipModule } from '../audio/wasm'
 import { readPref, writePref } from '../lib/prefs'
+import { toast } from '../lib/toast.svelte'
 import { download, zipSounds } from './export'
 import { library } from './library.svelte'
 import { editName, nextName, slugify } from './library-core'
@@ -23,7 +24,6 @@ class SfxLab {
   renderedRate = $state(48_000)
   fineTuneOpen = $state(readPref('sfx.fineTune') === 'open')
   exportRate = $state<number>(Number(readPref('sfx.exportRate')) === 48_000 ? 48_000 : 44_100)
-  toast = $state<{ id: number; text: string } | null>(null)
 
   /** The entry slider edits go into; editing anything else forks it first. */
   private draftId: string | null = null
@@ -199,7 +199,7 @@ class SfxLab {
   }
 
   notify(text: string) {
-    this.toast = { id: Date.now(), text }
+    toast.show(text)
   }
 }
 

@@ -323,6 +323,32 @@ class Composer {
     engine.previewOff(channel)
   }
 
+  private heldNote: number | null = null
+
+  /**
+   * A key pressed on a MIDI keyboard: plays it, and with `record` writes it like a
+   * typed note. While this pattern plays, notes land on the playing row instead.
+   */
+  midiNoteOn(note: number, record: boolean) {
+    this.heldNote = note
+    const pos = engine.position
+    if (record && engine.playing && pos && pos.order === this.orderIndex) {
+      this.edit({ note, instrument: this.instrument }, this.cursor.channel, pos.row)
+      this.preview(note)
+    } else if (record && this.view === 'tracker' && this.columnName === 'note') {
+      this.enterNote(note)
+    } else {
+      this.preview(note)
+    }
+  }
+
+  midiNoteOff(note: number) {
+    if (this.heldNote === note) {
+      this.previewOff()
+      this.heldNote = null
+    }
+  }
+
   // ---- cursor & selection --------------------------------------------------
 
   setCursor(cursor: Partial<Cursor>, select = false) {

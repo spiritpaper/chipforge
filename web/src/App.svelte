@@ -14,6 +14,7 @@
   import ChannelStrip from './components/ChannelStrip.svelte'
   import SfxLab from './components/sfx/SfxLab.svelte'
   import Toast from './components/Toast.svelte'
+  import { toast } from './lib/toast.svelte'
 
   $effect(() => {
     void lab.init(route.takeShareCode())
@@ -120,7 +121,7 @@
   {/if}
 </div>
 
-<Toast message={lab.toast} />
+<Toast message={toast.current} />
 
 <style>
   .shell {

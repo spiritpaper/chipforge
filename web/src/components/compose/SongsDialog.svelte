@@ -1,10 +1,29 @@
 <script lang="ts">
   import { composer } from '../../composer/composer.svelte'
+  import { MidiError, parseMidi } from '../../midi/smf'
+  import { midiToSong, type ImportReport } from '../../midi/convert'
 
   let { open = $bindable(false) }: { open: boolean } = $props()
 
   let dialog: HTMLDialogElement
   let confirmDelete = $state<string | null>(null)
+  let report = $state<ImportReport | null>(null)
+  let importError = $state<string | null>(null)
+  let fileInput: HTMLInputElement
+
+  async function importMidi(file: File) {
+    importError = null
+    try {
+      const title = file.name.replace(/\.midi?$/i, '') || 'Imported song'
+      const { song, report: r } = midiToSong(parseMidi(new Uint8Array(await file.arrayBuffer())), title)
+      await composer.create(song)
+      report = r
+    } catch (err) {
+      importError = err instanceof MidiError ? err.message : 'That file could not be read as MIDI.'
+    } finally {
+      fileInput.value = ''
+    }
+  }
 
   $effect(() => {
     if (open && !dialog.open) dialog.showModal()
@@ -20,14 +39,29 @@
   }
 </script>
 
-<dialog bind:this={dialog} onclose={() => ((open = false), (confirmDelete = null))} aria-labelledby="songs-title">
+<dialog bind:this={dialog} onclose={() => ((open = false), (confirmDelete = null), (report = null), (importError = null))} aria-labelledby="songs-title">
   <header>
     <h2 id="songs-title">Your songs</h2>
     <button class="key" onclick={() => (open = false)}>Close</button>
   </header>
   <p class="note">Songs save automatically in this browser.</p>
 
-  <button class="key new" onclick={async () => { await composer.create(); open = false }}>New empty song</button>
+  <div class="new-row">
+    <button class="key" onclick={async () => { await composer.create(); open = false }}>New empty song</button>
+    <button class="key" onclick={() => fileInput.click()}>From a MIDI file…</button>
+    <input bind:this={fileInput} type="file" accept=".mid,.midi,audio/midi" hidden onchange={(e) => e.currentTarget.files?.[0] && importMidi(e.currentTarget.files[0])} />
+  </div>
+
+  {#if importError}
+    <p class="error" role="alert">{importError}</p>
+  {/if}
+  {#if report}
+    <div class="report" role="status">
+      <p><strong>Imported “{report.title}”.</strong></p>
+      <ul>{#each report.lines as line, i (i)}<li>{line}</li>{/each}</ul>
+      <button class="key" onclick={() => (open = false)}>Start editing</button>
+    </div>
+  {/if}
 
   <ul>
     {#each composer.projects as p (p.id)}
@@ -77,6 +111,31 @@
   .note {
     margin: var(--u) 0 calc(var(--u) * 4);
     color: var(--muted);
+  }
+
+  .new-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--u) * 2);
+  }
+
+  .error {
+    margin-top: calc(var(--u) * 3);
+    color: var(--pulse1);
+  }
+
+  .report {
+    margin-top: calc(var(--u) * 3);
+    padding: calc(var(--u) * 3) calc(var(--u) * 4);
+    border-left: 3px solid var(--tri);
+    background: var(--panel);
+  }
+
+  .report ul {
+    margin: var(--u) 0 calc(var(--u) * 3);
+    padding-left: calc(var(--u) * 5);
+    color: var(--muted);
+    list-style: disc;
   }
 
   ul {
