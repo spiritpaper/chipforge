@@ -1,0 +1,15 @@
+[project]
+name = "chipforge-api"
+version = "0.1.0"
+description = "ChipForge backend: song conversion jobs (Phase 3)"
+requires-python = ">=3.12"
+dependencies = ["fastapi>=0.115", "uvicorn>=0.30"]
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx2", "ruff>=0.6"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -1,0 +1,129 @@
+/* ChipForge design tokens — see docs/DESIGN.md */
+
+:root {
+  --ink: #14122a;
+  --panel: #1e1b3a;
+  --line: #34305c;
+  --keycap-shadow: #0b0a1a;
+  --text: #e8e4ff;
+  --muted: #9a94c8;
+
+  --pulse1: #f85898;
+  --pulse2: #f8b800;
+  --tri: #3cbcfc;
+  --noise: #d8b8f8;
+  --dpcm: #58d854;
+
+  --font-ui: 'Chakra Petch', system-ui, sans-serif;
+  --font-data: 'JetBrains Mono', ui-monospace, monospace;
+  --font-mark: 'Silkscreen', var(--font-ui);
+
+  /* 1.2 scale on a 14px base */
+  --step--1: 12px;
+  --step-0: 14px;
+  --step-1: 17px;
+  --step-2: 20px;
+  --step-3: 24px;
+  --step-4: 29px;
+
+  --u: 4px;
+  --rail-w: 92px;
+  --radius-key: 4px;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: var(--step-0);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* A hardware key: flat cap with a hard bottom edge that compresses when pressed. */
+.key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 2);
+  min-height: 32px;
+  padding: 0 calc(var(--u) * 3);
+  border: 0;
+  border-radius: var(--radius-key);
+  background: var(--line);
+  box-shadow: 0 2px 0 var(--keycap-shadow);
+  cursor: pointer;
+  user-select: none;
+}
+
+.key:hover {
+  background: #403b6e;
+}
+
+.key:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.key:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+kbd {
+  font-family: var(--font-data);
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .key {
+    min-height: 44px;
+  }
+}

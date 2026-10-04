@@ -1,0 +1,10 @@
+{
+  "name": "chipforge",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "test": "cargo test --manifest-path core/Cargo.toml && pnpm --filter web test && cd api && uv run pytest"
+  },
+  "packageManager": "pnpm@11.22.0"
+}
