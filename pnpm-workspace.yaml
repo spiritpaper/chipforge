@@ -1,2 +1,5 @@
 packages:
   - web
+# core-js (via TensorFlow.js) only prints a banner in its install script.
+allowBuilds:
+  core-js: false

@@ -33,12 +33,12 @@
     <button
       class="key play"
       onclick={() => converter.togglePlay()}
-      aria-pressed={converter.playing}
+      aria-pressed={converter.playing || converter.chipPlaying}
       disabled={!converter.audio}
       title="Play or pause (Space)"
     >
-      <PixelIcon name={converter.playing ? 'stop' : 'play'} />
-      <span>{converter.playing ? 'Pause' : 'Play'}</span>
+      <PixelIcon name={converter.playing || converter.chipPlaying ? 'stop' : 'play'} />
+      <span>{converter.playing || converter.chipPlaying ? 'Pause' : 'Play'}</span>
       <kbd>Space</kbd>
     </button>
   {:else if mode === 'compose'}

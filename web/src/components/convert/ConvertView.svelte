@@ -3,6 +3,7 @@
   import PixelIcon from '../PixelIcon.svelte'
   import LofiPanel from './LofiPanel.svelte'
   import Overview from './Overview.svelte'
+  import ChipPanel from './ChipPanel.svelte'
 
   let fileInput: HTMLInputElement
   let dragging = $state(false)
@@ -36,21 +37,35 @@
     <header class="head">
       <div>
         <h1>{converter.audio.name}</h1>
-        <p class="sub">Converted live as it plays. Nothing is uploaded.</p>
+        <p class="sub">Everything happens on this device. Nothing is uploaded.</p>
       </div>
       <button class="key" onclick={() => fileInput.click()}>Choose another file</button>
     </header>
     {#if converter.error}<p class="error" role="alert">{converter.error}</p>{/if}
 
+    <div class="modes" role="tablist" aria-label="Kind of conversion">
+      <button role="tab" aria-selected={converter.mode === 'lofi'} onclick={() => converter.setMode('lofi')}>
+        <span class="mode-name">Lo-fi filter</span>
+        <span class="mode-desc">Instant crunch. Keeps the original recording.</span>
+      </button>
+      <button role="tab" aria-selected={converter.mode === 'chip'} onclick={() => converter.setMode('chip')}>
+        <span class="mode-name">Chip version</span>
+        <span class="mode-desc">Notes replayed on the NES chip. Editable in Compose.</span>
+      </button>
+    </div>
+
     <div class="player">
       <div class="ab" role="radiogroup" aria-label="Listen to" title="Compare (B)">
-        <button role="radio" aria-checked={!converter.original} onclick={() => converter.setOriginal(false)}>8-bit</button>
-        <button role="radio" aria-checked={converter.original} onclick={() => converter.setOriginal(true)}>Original</button>
+        <button role="radio" aria-checked={!converter.original} disabled={converter.mode === 'chip' && !converter.result} onclick={() => converter.compare(false)}>{converter.mode === 'chip' ? 'Chip version' : '8-bit'}</button>
+        <button role="radio" aria-checked={converter.original} onclick={() => converter.compare(true)}>Original</button>
       </div>
       <span class="hint">Space plays, B compares, ←/→ on the waveform jumps 5 seconds</span>
     </div>
     <Overview />
 
+    {#if converter.mode === 'chip'}
+      <ChipPanel />
+    {:else}
     <LofiPanel />
 
     <section class="export" aria-labelledby="convert-export">
@@ -64,6 +79,7 @@
         {converter.exporting ? 'Rendering…' : 'Download'}
       </button>
     </section>
+    {/if}
   {/if}
 </div>
 
@@ -128,6 +144,39 @@
     align-items: flex-start;
     flex-wrap: wrap;
     gap: calc(var(--u) * 4);
+  }
+
+  .modes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: calc(var(--u) * 2);
+  }
+
+  .modes button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--u);
+    padding: calc(var(--u) * 3) calc(var(--u) * 4);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-key);
+    background: none;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .modes button[aria-selected='true'] {
+    border-color: var(--text);
+    background: var(--panel);
+  }
+
+  .mode-name {
+    font-weight: 600;
+  }
+
+  .mode-desc {
+    color: var(--muted);
+    font-size: var(--step--1);
   }
 
   .player {

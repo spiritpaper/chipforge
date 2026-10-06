@@ -26,7 +26,7 @@
     const mode = route.mode
     untrack(() => {
       engine.stop()
-      if (mode !== 'convert') converter.pause()
+      if (mode !== 'convert') converter.stopAll()
       if (mode === 'compose') void composer.init().then(() => engine.setSong(composer.song))
     })
   })
@@ -71,7 +71,7 @@
         e.preventDefault()
         converter.togglePlay()
       } else if (e.code === 'KeyB') {
-        converter.setOriginal(!converter.original)
+        converter.compare(!converter.original)
       }
       return
     }
