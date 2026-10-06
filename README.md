@@ -6,7 +6,7 @@ for your games.
 - [Product & build plan](docs/PLAN.md)
 - [Design system](docs/DESIGN.md)
 
-**Status:** Phase 2 is done.
+**Status:** Phase 3 is done.
 
 - **SFX Lab** makes game sound effects: ten seeded presets plus random, mutate,
   fine-tune sliders, a history with kept sounds, WAV and zip export, share links.
@@ -14,6 +14,9 @@ for your games.
   roll on the same patterns, instruments with drawable volume/tone/bend/chord
   macros, a song-order strip, undo, autosave, starter templates, MIDI keyboard
   input, MIDI import/export, and WAV/OGG export with loop points for game engines.
+- **Convert** turns any recording into 8-bit: the **Lo-fi Filter** crunches it live,
+  and **Chip version** transcribes its notes, beat and drums (Basic Pitch on your GPU
+  via WebGL) and rebuilds it as an editable chip song. Nothing is uploaded.
 
 Everything runs in the browser and works offline after the first visit.
 
@@ -37,6 +40,7 @@ Rust (stable) with `rustup target add wasm32-unknown-unknown`, Node 24 with pnpm
 pnpm install
 pnpm dev              # builds the WASM core, then starts the app at http://localhost:5173
 pnpm test             # Rust, web and API tests
+pnpm build && pnpm --filter web e2e   # end-to-end checks in headless Chrome
 
 cd core && cargo run --release --example render_song -- song.cfs song.wav   # render an encoded song offline
 cd api && uv run uvicorn app.main:app --reload                     # run the API

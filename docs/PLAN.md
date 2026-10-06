@@ -108,31 +108,40 @@ As built, also:
 
 ---
 
-## Phase 3 — Converter (4–6 weeks)
+## Phase 3 — Converter (4–6 weeks) — built in the browser
 
 Goal: upload a song, get back an editable chiptune version that sounds recognizably
 like the original.
 
-1. **Lo-fi Filter mode (browser-only)**: sample-rate reduction, bit-depth reduction,
-   square waveshaping, band-limiting. Instant, free, private — no upload.
+The plan below assumed a Python service with stem separation. To avoid gigabytes of
+models, Phase 3 shipped **entirely in the browser** instead; the server path stays
+here as Phase 3b for later.
+
+Built:
+1. **Lo-fi Filter**: sample-and-hold, bit depth, square fuzz, brightness, mix; four
+   presets; live A/B; WAV/OGG export rendered with the same DSP class as the preview.
+2. **Chip version**: Basic Pitch (0.9 MB of weights) on TensorFlow.js in a worker,
+   on the GPU through WebGL; tempo and beat from an onset envelope below 4 kHz; drums
+   from band-jump classification; clean-up of overtones, bass octave errors and notes
+   the model splits at drum hits (using each note's measured attack); an arranger
+   for lead, chords-as-arpeggios, bass and drums; tempo half/double, detail, chord
+   and drum options; A/B in place; **Open in Compose**.
+3. **Accuracy check**: an end-to-end test transcribes a generated song with known
+   contents; the result is exact (melody 16/16, bass 8/8, kicks and snares 8/8).
+
+Limits of the browser approach (no stems): dense mixes with many instruments in the
+same range give busier, less certain parts. The Detail setting and Compose are the
+remedies.
+
+### Phase 3b — server conversion (later, optional)
+
 2. **Worker service**: Python worker with a Redis queue; GPU optional.
    API: `POST /jobs` (upload) → `GET /jobs/{id}` (progress events via SSE) →
    `GET /jobs/{id}/result`.
-3. **Stem separation**: Demucs (htdemucs) → vocals / bass / drums / other.
-4. **Transcription**: Basic Pitch on vocals, bass and other → MIDI notes with
-   confidence. Drums → onset detection + classification (kick / snare / hat).
-5. **Tempo & grid**: beat tracking → BPM + downbeats; quantize notes to grid, choose
-   tracker speed.
-6. **Arranger** (the secret sauce, rule-based first):
-   - melody = monophonic skyline of vocals (fallback: highest confident line in "other")
-   - harmony = chord detection → fast arpeggios on Pulse 2
-   - bass = lowest line of bass stem, octave-folded into triangle range
-   - drums = noise-channel patches + optional DPCM kick
-   - "Busyness" slider controls note density and ornamentation.
-7. **Result screen**: A/B toggle original ↔ chip version, per-channel mute, then
-   **"Open in Composer"** — transcription errors are fixable, not fatal.
-8. **Limits & caching**: content-hash cache, length limit on free tier, uploads deleted
-   after 24 h, clear personal-use notice.
+3. **Stem separation**: Demucs (htdemucs) → vocals / bass / drums / other, then the
+   same transcription and arranger per stem, which should help dense mixes most.
+8. **Limits & caching**: content-hash cache, length limit, uploads deleted after 24 h,
+   clear personal-use notice.
 
 ---
 

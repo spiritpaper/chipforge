@@ -106,6 +106,16 @@ lavender), and the same rule applies to history thumbnails.
   order previews. The noise channel writes its 16 sounds as `0-#` … `F-#`.
 - Destructive actions confirm in place with the consequence ("64 notes use it").
 
+## Convert
+
+- Opens on one clear job: "Turn a song into 8-bit", a file picker and the promise
+  that nothing is uploaded.
+- Two conversions as tabs with one-line explanations: Lo-fi filter (instant, keeps
+  the recording) and Chip version (notes replayed on the chip, editable).
+- One shared waveform with a playhead, and an A/B switch (B) that keeps your place.
+- Chip version reports in plain words what it kept ("16 melody notes, 8 bass …") and
+  ends in a single primary action: Open in Compose.
+
 ## Interaction principles
 
 1. **Sound first.** Every control previews instantly (under 50 ms). If you can change
