@@ -43,6 +43,7 @@ export function validateSong(x: unknown): Song | null {
   if (typeof x !== 'object' || x === null) return null
   const s = x as Record<string, unknown>
   if (s.version !== SONG_VERSION || typeof s.title !== 'string') return null
+  if (s.chip !== undefined && s.chip !== 'nes' && s.chip !== 'gb') return null
   if (!isInt(s.bpm, ...LIMITS.bpm) || !isInt(s.speed, ...LIMITS.speed) || !isInt(s.rowsPerBeat, 1, 32)) return null
   if (!isInt(s.patternLength, ...LIMITS.patternLength)) return null
   const rows = s.patternLength
@@ -66,6 +67,7 @@ export function validateSong(x: unknown): Song | null {
   return {
     version: SONG_VERSION,
     title: s.title,
+    ...(s.chip === 'gb' ? { chip: 'gb' as const } : {}),
     bpm: s.bpm,
     speed: s.speed,
     rowsPerBeat: s.rowsPerBeat,

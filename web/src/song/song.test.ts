@@ -6,6 +6,7 @@ import { buildPattern, parseTrack } from './build'
 import { encodeSong } from './encode'
 import { EMPTY_CELL, NOTE_OFF, NOTE_RELEASE, emptySong, noteLabel, parseNote, songSeconds, type Song } from './model'
 import { firstLight } from './templates'
+import { validateSong } from './validate'
 
 let wasm: ChipExports
 
@@ -110,7 +111,27 @@ describe('songs on the real chip (WASM)', () => {
     expect(renderVgm(wasm, new Uint8Array([1, 2]), '')).toBeNull()
   })
 
+  it('plays songs on the Game Boy chip too', () => {
+    const gb: Song = { ...firstLight(), chip: 'gb' }
+    expect(encodeSong(gb)[17]).toBe(1)
+    expect(encodeSong(firstLight())[17]).toBe(0)
+    const [nes, dmg] = [playFor(firstLight(), 1), playFor(gb, 1)]
+    expect(rms(dmg)).toBeGreaterThan(0.05)
+    expect(dmg).not.toEqual(nes)
+    const view = new DataView(renderVgm(wasm, encodeSong(gb), '')!.buffer)
+    expect(view.getUint32(0x80, true)).toBe(4_194_304)
+    expect(view.getUint32(0x84, true)).toBe(0)
+  })
+
   it('returns null when asked to render garbage', () => {
     expect(renderSong(wasm, new Uint8Array([1, 2, 3]), 44_100)).toBeNull()
+  })
+})
+
+describe('song chips', () => {
+  it('keeps the chip through validation and treats a missing one as NES', () => {
+    expect(validateSong({ ...firstLight(), chip: 'gb' })?.chip).toBe('gb')
+    expect(validateSong(firstLight())?.chip).toBeUndefined()
+    expect(validateSong({ ...firstLight(), chip: 'sid' })).toBeNull()
   })
 })

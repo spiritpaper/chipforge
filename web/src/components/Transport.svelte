@@ -5,6 +5,7 @@
   import { lab } from '../sfx/lab.svelte'
   import { composer } from '../composer/composer.svelte'
   import { converter } from '../convert/converter.svelte'
+  import { CHIPS, type ChipKind } from '../song/model'
 
   let { mode }: { mode: Mode } = $props()
 
@@ -96,7 +97,18 @@
     />
   </div>
 
-  <p class="chip" title="The sound chip being emulated">NES (2A03)</p>
+  {#if mode === 'compose'}
+    <label class="field chip-pick" title="The sound chip this song plays on. Notes and instruments carry over when you switch.">
+      Chip
+      <select value={composer.song.chip ?? 'nes'} onchange={(e) => composer.setChip(e.currentTarget.value as ChipKind)}>
+        {#each Object.entries(CHIPS) as [id, chip] (id)}
+          <option value={id}>{chip.detail}</option>
+        {/each}
+      </select>
+    </label>
+  {:else}
+    <p class="chip" title="The sound chip being emulated">{CHIPS.nes.detail}</p>
+  {/if}
 
   <p class="status" role="status">{statusText}</p>
 </header>
@@ -175,6 +187,15 @@
     border-radius: var(--radius-key);
     font-size: var(--step--1);
     color: var(--muted);
+  }
+
+  .chip-pick select {
+    padding: var(--u) calc(var(--u) * 2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-key);
+    background: var(--panel);
+    font-size: var(--step--1);
+    color: var(--text);
   }
 
   .status {

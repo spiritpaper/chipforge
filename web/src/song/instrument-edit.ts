@@ -1,6 +1,6 @@
 // Instrument edits: pure, like song/edit.ts.
 
-import { LIMITS, emptyMacro, type Cell, type Instrument, type Macro, type Song } from './model'
+import { LIMITS, emptyMacro, type Cell, type ChipKind, type Instrument, type Macro, type Song } from './model'
 
 export type MacroKind = 'volume' | 'duty' | 'pitch' | 'arpeggio'
 
@@ -11,6 +11,10 @@ export const MACRO_RANGE: Record<MacroKind, [number, number]> = {
   pitch: [-16, 16],
   arpeggio: [-12, 24],
 }
+
+/** The Game Boy's wave channel reads the Tone macro as one of eight waveforms. */
+export const macroRange = (kind: MacroKind, chip: ChipKind = 'nes'): [number, number] =>
+  kind === 'duty' && chip === 'gb' ? [0, 7] : MACRO_RANGE[kind]
 
 export const MAX_MACRO_STEPS = 64
 
@@ -48,8 +52,8 @@ export function instrumentUses(song: Song, index: number): number {
   return n
 }
 
-export function setMacroValues(m: Macro, from: number, values: number[], kind: MacroKind): Macro {
-  const [lo, hi] = MACRO_RANGE[kind]
+export function setMacroValues(m: Macro, from: number, values: number[], kind: MacroKind, chip: ChipKind = 'nes'): Macro {
+  const [lo, hi] = macroRange(kind, chip)
   const next = m.values.slice()
   values.forEach((v, i) => {
     if (from + i < next.length) next[from + i] = Math.min(hi, Math.max(lo, Math.round(v)))

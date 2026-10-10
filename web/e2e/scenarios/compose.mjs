@@ -55,4 +55,18 @@ export default async function ({ page, sleep, BASE, check, shot }) {
   await clickText(page, '.templates button', 'Boss')
   await sleep(500)
   check('templates open as new songs', (await page.evaluate(() => document.querySelector('input.title')?.value)) === 'Boss')
+
+  // The same song on the Game Boy chip.
+  await page.select('.chip-pick select', 'gb')
+  await sleep(800)
+  const channelNames = await page.evaluate(() => document.querySelector('.strips')?.textContent ?? '')
+  check('the song moves to the Game Boy chip', (await readSong(page)).chip === 'gb' && channelNames.includes('Wave'), channelNames)
+  await page.click('.transport .play')
+  await sleep(1200)
+  check('and plays there', (await page.evaluate(() => document.querySelector('.transport .play')?.getAttribute('aria-pressed'))) === 'true')
+  await shot('game-boy')
+  await page.click('.transport .play')
+  await page.select('.chip-pick select', 'nes')
+  await sleep(800)
+  check('and back to the NES', (await readSong(page)).chip === undefined)
 }

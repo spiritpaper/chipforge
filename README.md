@@ -10,7 +10,8 @@ for your games.
 
 - **SFX Lab** makes game sound effects: ten seeded presets plus random, mutate,
   fine-tune sliders, a history with kept sounds, WAV and zip export, share links.
-- **Compose** writes chiptune songs on the emulated NES chip: a tracker and a piano
+- **Compose** writes chiptune songs on an emulated NES or Game Boy chip (switch any
+  time; the Game Boy's wave channel has eight waveforms): a tracker and a piano
   roll on the same patterns, instruments with drawable volume/tone/bend/chord
   macros, a song-order strip, undo, autosave, starter templates, MIDI keyboard
   input, MIDI import/export, and WAV/OGG export with loop points for game engines.
@@ -22,7 +23,7 @@ for your games.
   (switch section on the bar line, mute layers, change tempo, play-once jingles):
   a [Godot 4 plugin](engines/godot/README.md), a [Unity package](engines/unity/README.md)
   and a [C library](native/include/chipforge.h) for everything else. Songs also export
-  as VGM (NES register logs for VGM players) and FamiTracker text.
+  as VGM (NES or Game Boy register logs for VGM players) and FamiTracker text.
 
 The web app runs in the browser and works offline after the first visit.
 

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { engine } from '../../audio/engine.svelte'
-  import { CHANNELS } from '../../audio/channels'
+  import { channelsFor } from '../../audio/channels'
   import { composer } from '../../composer/composer.svelte'
   import { COLUMNS, PIANO_KEYS, trackerAction } from '../../composer/keys'
   import { noteLabel, type Cell } from '../../song/model'
@@ -54,7 +54,7 @@
       line: v('--line'),
       text: v('--text'),
       muted: v('--muted'),
-      channels: CHANNELS.map((c) => v(c.color.slice(4, -1))),
+      channels: channelsFor(composer.song.chip).map((c) => v(c.color.slice(4, -1))),
     }
   }
 
@@ -212,7 +212,7 @@
   const announcement = $derived.by(() => {
     const { row, channel, column } = composer.cursor
     const c = cellText(pattern.channels[channel][row], channel)
-    return `Row ${row}, ${CHANNELS[channel].name}, ${COLUMNS[column] === 'note' ? 'note' : 'column ' + (column + 1)}: ${c.note} ${c.inst} ${c.vol} ${c.fx}`
+    return `Row ${row}, ${channelsFor(composer.song.chip)[channel].name}, ${COLUMNS[column] === 'note' ? 'note' : 'column ' + (column + 1)}: ${c.note} ${c.inst} ${c.vol} ${c.fx}`
   })
 </script>
 
@@ -223,7 +223,7 @@
   style:--min-width="{gutter + 4 * (CELL_CHARS + CHANNEL_PAD) * charWidth}px"
 >
   <div class="heads" aria-hidden="true">
-    {#each CHANNELS as info, ch (info.name)}
+    {#each channelsFor(composer.song.chip) as info, ch (info.name)}
       <div class="head" class:silent={!engine.audible(ch)} style:--c={info.color}>
         <span class="name">{info.name}</span>
         <span class="role">{info.role}</span>

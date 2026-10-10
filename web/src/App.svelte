@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import { engine } from './audio/engine.svelte'
-  import { CHANNELS } from './audio/channels'
+  import { channelsFor } from './audio/channels'
   import { isTypingTarget, sfxShortcut } from './lib/keys'
   import { route } from './lib/route.svelte'
   import { lab } from './sfx/lab.svelte'
@@ -113,7 +113,7 @@
   {#if route.mode === 'compose'}
     <ComposeView />
     <section class="strips" aria-label="Chip channels">
-      {#each CHANNELS as info, channel (info.name)}
+      {#each channelsFor(composer.song.chip) as info, channel (info.name)}
         <ChannelStrip {channel} {info} />
       {/each}
     </section>

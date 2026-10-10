@@ -4,6 +4,17 @@
 export const SONG_VERSION = 1
 export const CHANNEL_COUNT = 4
 
+/** The sound chip a song plays on. Both have two pulses, a third melodic channel and noise. */
+export type ChipKind = 'nes' | 'gb'
+
+export const CHIPS: Record<ChipKind, { name: string; detail: string }> = {
+  nes: { name: 'NES', detail: 'NES (2A03)' },
+  gb: { name: 'Game Boy', detail: 'Game Boy (DMG)' },
+}
+
+/** Game Boy wave channel waveforms, picked by the Tone macro (core/src/gb.rs WAVES). */
+export const GB_WAVES = ['Saw', 'Square', 'Triangle', 'Sine', 'Pulse 25%', 'Pulse 12.5%', 'Organ', 'Buzz'] as const
+
 /** Cell `note` values besides MIDI notes 0..127. */
 export const NOTE_OFF = -1
 export const NOTE_RELEASE = -2
@@ -29,7 +40,7 @@ export interface Instrument {
   name: string
   /** 0..15 per tick; empty = full volume. */
   volume: Macro
-  /** 0..3 pulse duty (noise: 1 = metallic); empty = 50%. */
+  /** 0..3 pulse duty (noise: 1 = metallic; Game Boy wave: waveform 0..7); empty = 50% / triangle. */
   duty: Macro
   /** Pitch change per tick in 1/16 semitones, accumulated. */
   pitch: Macro
@@ -45,6 +56,8 @@ export interface Pattern {
 export interface Song {
   version: typeof SONG_VERSION
   title: string
+  /** Absent means 'nes' (songs from before there was a choice). */
+  chip?: ChipKind
   bpm: number
   /** Ticks per row. */
   speed: number

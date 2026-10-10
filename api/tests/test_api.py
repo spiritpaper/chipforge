@@ -160,6 +160,10 @@ def test_invalid_and_oversized_songs_are_refused(env):
     cells = copy.deepcopy(small_song())
     cells["patterns"][0]["channels"][0][0]["note"] = 500
     assert c.put("/api/songs/s1", json={"song": cells, "baseVersion": None}).status_code == 422
+    sid = {**small_song(), "chip": "sid"}
+    assert c.put("/api/songs/s1", json={"song": sid, "baseVersion": None}).status_code == 422
+    game_boy = {**small_song(), "chip": "gb"}
+    assert c.put("/api/songs/gb", json={"song": game_boy, "baseVersion": None}).status_code == 200
     huge = small_song("x" * 100)
     huge["instruments"][0]["name"] = "x" * 3_000_000
     assert c.put("/api/songs/s1", json={"song": huge, "baseVersion": None}).status_code == 413

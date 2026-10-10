@@ -7,6 +7,7 @@
   import { toast } from '../../lib/toast.svelte'
   import { loadChipModule } from '../../audio/wasm'
   import { encodeSong } from '../../song/encode'
+  import { CHIPS } from '../../song/model'
   import { instantiateChip, renderVgm } from '../../audio/chip-wasm'
   import { songToFamiTracker } from '../../export/famitracker'
   import RenderWorker from '../../export/render-worker.ts?worker'
@@ -197,8 +198,8 @@
   <section>
     <h3>VGM file</h3>
     <p>
-      The song as writes to a real NES sound chip, for VGM players (VGMPlay, foobar2000) and
-      chiptune archives. Loops where the song loops.
+      The song as writes to a real {CHIPS[composer.song.chip ?? 'nes'].name} sound chip, for VGM
+      players (VGMPlay, foobar2000) and chiptune archives. Loops where the song loops.
     </p>
     <button class="key" onclick={exportVgm}>Download {base}.vgm</button>
   </section>
@@ -208,7 +209,8 @@
     <p>
       Open in FamiTracker or Dn-FamiTracker with File → Import Text. Notes, instruments, volumes
       and most effects carry over; slides and pitch bends use different units there, so they
-      may sound a little different.
+      may sound a little different.{#if composer.song.chip === 'gb'}
+        FamiTracker is an NES tracker, so this Game Boy song plays on the NES chip there.{/if}
     </p>
     <button class="key" onclick={exportFamiTracker}>Download {base}.famitracker.txt</button>
   </section>

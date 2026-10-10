@@ -19,7 +19,7 @@ import {
   type Clip,
   type Region,
 } from '../song/edit'
-import { CHANNEL_COUNT, LIMITS, NOTE_OFF, NOTE_RELEASE, emptySong, type Cell, type Song } from '../song/model'
+import { CHANNEL_COUNT, LIMITS, NOTE_OFF, NOTE_RELEASE, emptySong, type Cell, type ChipKind, type Song } from '../song/model'
 import { firstLight } from '../song/templates'
 import { COLUMNS, COLUMN_COUNT, type Column, type TrackerAction } from './keys'
 import { addInstrument, deleteInstrument, updateInstrument, type MacroKind } from '../song/instrument-edit'
@@ -244,6 +244,13 @@ class Composer {
   setBpm(bpm: number) {
     if (!Number.isFinite(bpm)) return
     this.commit({ ...this.song, bpm: Math.round(Math.min(LIMITS.bpm[1], Math.max(LIMITS.bpm[0], bpm))) }, 'bpm')
+  }
+
+  /** Moves the song to another chip; notes and instruments carry over. */
+  setChip(chip: ChipKind) {
+    if ((this.song.chip ?? 'nes') === chip) return
+    const { chip: _, ...rest } = this.song
+    this.commit(chip === 'gb' ? { ...rest, chip } : rest)
   }
 
   setSpeed(speed: number) {

@@ -34,7 +34,7 @@ export function encodeSong(song: Song): Uint8Array<ArrayBuffer> {
   u16(song.order.length)
   u16(clampInt(song.loopPoint, 0, song.order.length - 1))
   u8(Math.min(song.instruments.length, 64))
-  u8(0)
+  u8(song.chip === 'gb' ? 1 : 0)
   for (const p of song.order) u16(p)
 
   for (const inst of song.instruments.slice(0, 64)) {

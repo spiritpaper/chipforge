@@ -44,6 +44,8 @@ def song_problem(s: Any) -> str | None:
         return "not a version 1 song"
     if not isinstance(s.get("title"), str) or len(s["title"]) > 200:
         return "bad title"
+    if s.get("chip", "nes") not in ("nes", "gb"):
+        return "unknown chip"
     if not (
         _int(s.get("bpm"), 30, 300)
         and _int(s.get("speed"), 1, 31)

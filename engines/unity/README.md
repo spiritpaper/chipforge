@@ -1,7 +1,8 @@
 # ChipForge for Unity
 
 Play songs made in [ChipForge](../../README.md) live in Unity 2021.3 or newer, on the
-same emulated NES chip as the web app, with adaptive controls.
+same emulated chips as the web app (NES or Game Boy, whichever the song is written
+for), with adaptive controls.
 
 ## Install
 
