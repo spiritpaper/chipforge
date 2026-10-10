@@ -440,7 +440,10 @@ mod tests {
     /// Uses `VGM2WAV`, else `vgm2wav` on PATH; None if unavailable.
     fn decode_with_libvgm(vgm: &[u8]) -> Option<Vec<f32>> {
         let tool = std::env::var("VGM2WAV").unwrap_or_else(|_| "vgm2wav".into());
-        let dir = std::env::temp_dir().join(format!("chipforge-vgm-{}", std::process::id()));
+        // Tests run in parallel: each call gets its own directory.
+        static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("chipforge-vgm-{}-{call}", std::process::id()));
         std::fs::create_dir_all(&dir).ok()?;
         let (vgm_path, wav_path) = (dir.join("song.vgm"), dir.join("song.wav"));
         std::fs::write(&vgm_path, vgm).ok()?;
