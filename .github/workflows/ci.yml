@@ -95,3 +95,15 @@ jobs:
             unzip -q $zip && mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 godot && rm $zip
           fi
       - run: GODOT=~/godot/godot engines/godot/test.sh
+
+  unity-wrapper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      # The C# wrapper against the native library; the Unity-only parts need Unity.
+      - run: engines/unity/test.sh

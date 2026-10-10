@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles the package's Unity-free files and checks them against the real native
+       library. The MonoBehaviour and importer need Unity and aren't built here. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../com.chipforge.player/Runtime/Native.cs" />
+    <Compile Include="../com.chipforge.player/Runtime/ChipForgePlayer.cs" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+</Project>
