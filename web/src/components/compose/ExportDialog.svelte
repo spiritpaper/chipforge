@@ -8,6 +8,7 @@
   import { loadChipModule } from '../../audio/wasm'
   import { encodeSong } from '../../song/encode'
   import { instantiateChip, renderVgm } from '../../audio/chip-wasm'
+  import { songToFamiTracker } from '../../export/famitracker'
   import RenderWorker from '../../export/render-worker.ts?worker'
   import type { RenderRequest, RenderResponse } from '../../export/render-worker'
   import type { AudioFormat, Ending } from '../../export/audio'
@@ -95,6 +96,11 @@
     toast.show(`Saved ${base}.vgm`)
   }
 
+  function exportFamiTracker() {
+    download(songToFamiTracker(composer.song), `${base}.famitracker.txt`, 'text/plain')
+    toast.show(`Saved ${base}.famitracker.txt`)
+  }
+
   function exportSongFile() {
     download(JSON.stringify(composer.song), `${base}.chipsong.json`, 'application/json')
     toast.show(`Saved ${base}.chipsong.json`)
@@ -153,6 +159,16 @@
       chiptune archives. Loops where the song loops.
     </p>
     <button class="key" onclick={exportVgm}>Download {base}.vgm</button>
+  </section>
+
+  <section>
+    <h3>FamiTracker text</h3>
+    <p>
+      Open in FamiTracker or Dn-FamiTracker with File → Import Text. Notes, instruments, volumes
+      and most effects carry over; slides and pitch bends use different units there, so they
+      may sound a little different.
+    </p>
+    <button class="key" onclick={exportFamiTracker}>Download {base}.famitracker.txt</button>
   </section>
 
   <section>

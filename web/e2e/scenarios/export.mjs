@@ -27,6 +27,11 @@ export default async function ({ page, sleep, BASE, tmp, downloads, check, shot 
     check('libvgm plays the VGM with its loop', Math.abs(seconds - (2 * 6.857 + 8)) < 0.1, `${seconds} s`)
   }
 
+  await clickText(page, 'dialog[open] .key', 'Download first-light.famitracker.txt')
+  const ft = await waitForFile(downloads, (f) => f.endsWith('.famitracker.txt'), sleep)
+  const ftText = ft ? fs.readFileSync(ft, 'utf8') : ''
+  check('FamiTracker text has the song', ftText.startsWith('# FamiTracker text export') && (ftText.match(/^ROW /gm) || []).length === 64)
+
   await clickText(page, 'dialog[open] .key', 'Download first-light.mid')
   const mid = await waitForFile(downloads, (f) => f.endsWith('.mid'), sleep)
   check('MIDI file starts with MThd', mid && fs.readFileSync(mid).subarray(0, 4).toString() === 'MThd')
