@@ -40,6 +40,9 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      # Registry mirrors write their own tarball URLs into the lockfile; the integrity
+      # hashes are what matter, so URLs must not be committed (`pnpm lockfile:clean`).
+      - run: "! grep -n 'tarball: http' pnpm-lock.yaml"
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter web wasm
       - run: pnpm --filter web check

@@ -23,6 +23,9 @@ pnpm install
 pnpm dev          # app at http://localhost:5173
 ```
 
+If your npm registry is a mirror, adding a dependency may write the mirror's download
+URLs into `pnpm-lock.yaml`; run `pnpm lockfile:clean` before committing (CI checks).
+
 ## Before you open a pull request
 
 ```sh
