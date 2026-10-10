@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "chipcore"
 version = "0.1.0"
+
+[[package]]
+name = "chipforge"
+version = "0.1.0"
+dependencies = [
+ "chipcore",
+]

@@ -1,0 +1,17 @@
+[workspace]
+members = ["core", "native"]
+resolver = "3"
+
+# The browser build: small and with no unwinding machinery.
+[profile.wasm]
+inherits = "release"
+opt-level = "s"
+lto = true
+panic = "abort"
+strip = true
+codegen-units = 1
+
+# Native libraries for game engines: fast, and panics unwind so a bug can't take the
+# editor down with it.
+[profile.release]
+lto = "thin"

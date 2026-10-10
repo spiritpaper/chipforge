@@ -7,10 +7,3 @@ license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-
-[profile.release]
-opt-level = "s"
-lto = true
-panic = "abort"
-strip = true
-codegen-units = 1

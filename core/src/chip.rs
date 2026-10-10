@@ -23,6 +23,7 @@ pub struct Chip {
     high_pass: OnePole,
     low_pass: OnePole,
     player: Player,
+    volume: f32,
     out: Vec<f32>,
     scope: [[f32; SCOPE_LEN]; CHANNELS],
     scope_pos: usize,
@@ -50,6 +51,7 @@ impl Chip {
             high_pass: OnePole::new(37.0, sample_rate),
             low_pass: OnePole::new(14_000.0, sample_rate),
             player: Player::default(),
+            volume: 1.0,
             out: vec![0.0; MAX_BLOCK],
             scope: [[0.0; SCOPE_LEN]; CHANNELS],
             scope_pos: 0,
@@ -86,6 +88,15 @@ impl Chip {
         if let Some(m) = self.muted.get_mut(channel) {
             *m = muted;
         }
+    }
+
+    /// Master volume, 0..=2 (1 is unchanged).
+    pub fn set_volume(&mut self, volume: f32) {
+        self.volume = if volume.is_finite() {
+            volume.clamp(0.0, 2.0)
+        } else {
+            1.0
+        };
     }
 
     pub fn is_muted(&self, channel: usize) -> bool {
@@ -136,7 +147,7 @@ impl Chip {
         let filtered = self
             .low_pass
             .low_pass(self.high_pass.high_pass(pulse_out + tnd_out));
-        (filtered * OUTPUT_GAIN).clamp(-1.0, 1.0)
+        (filtered * OUTPUT_GAIN * self.volume).clamp(-1.0, 1.0)
     }
 
     /// Renders `frames` mono samples (capped at [`MAX_BLOCK`]) into the internal buffer.

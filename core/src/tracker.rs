@@ -573,6 +573,14 @@ pub struct Player {
     pending_loop: bool,
     /// Set when a row starts playing; see [`Player::take_row_started`].
     row_started: Option<Position>,
+    /// Multiplies the tempo (adaptive music: speed up when things get tense).
+    tempo_scale: f64,
+    /// Stop at the end of the song instead of looping (jingles, stingers).
+    play_once: bool,
+    /// Set when a play-once song reaches its end; see [`Player::take_finished`].
+    finished: bool,
+    /// Order entry to switch to when the current pattern ends.
+    queued: Option<usize>,
 }
 
 impl Default for Player {
@@ -600,6 +608,10 @@ impl Player {
             loops: 0,
             pending_loop: false,
             row_started: None,
+            tempo_scale: 1.0,
+            play_once: false,
+            finished: false,
+            queued: None,
         }
     }
 
@@ -637,8 +649,43 @@ impl Player {
         self.loops = 0;
         self.pending_loop = false;
         self.row_started = None;
+        self.finished = false;
+        self.queued = None;
         self.channels = Default::default();
         self.playing = true;
+    }
+
+    /// Scales the tempo, 0.25×–4×, without changing the song.
+    pub fn set_tempo_scale(&mut self, scale: f64) {
+        self.tempo_scale = if scale.is_finite() {
+            scale.clamp(0.25, 4.0)
+        } else {
+            1.0
+        };
+    }
+
+    pub fn tempo_scale(&self) -> f64 {
+        self.tempo_scale
+    }
+
+    /// With `on`, the song stops at its end (letting notes release) instead of looping.
+    pub fn set_play_once(&mut self, on: bool) {
+        self.play_once = on;
+    }
+
+    /// True once after a play-once song has ended.
+    pub fn take_finished(&mut self) -> bool {
+        std::mem::take(&mut self.finished)
+    }
+
+    /// Switches to order entry `order` when the current pattern ends, so music changes
+    /// section on a bar line instead of mid-phrase. Replaces any earlier request.
+    pub fn queue_order(&mut self, order: usize) {
+        self.queued = Some(order.min(self.song.order.len() - 1));
+    }
+
+    pub fn queued_order(&self) -> Option<usize> {
+        self.queued
     }
 
     pub fn stop(&mut self) {
@@ -694,7 +741,8 @@ impl Player {
     pub fn clock(&mut self, sample_rate: f32) -> bool {
         let ticked = self.samples_to_tick <= 0.0;
         if ticked {
-            self.samples_to_tick += sample_rate as f64 / self.song.tick_rate(self.speed, self.bpm);
+            self.samples_to_tick +=
+                sample_rate as f64 / (self.song.tick_rate(self.speed, self.bpm) * self.tempo_scale);
             self.run_tick();
         }
         self.samples_to_tick -= 1.0;
@@ -722,6 +770,10 @@ impl Player {
 
     fn process_row(&mut self) {
         if std::mem::take(&mut self.pending_loop) {
+            if self.play_once {
+                self.end();
+                return;
+            }
             self.loops += 1;
         }
         self.row_started = Some(Position {
@@ -755,6 +807,15 @@ impl Player {
         }
     }
 
+    /// Ends a play-once song: notes play their release, then the player stops.
+    fn end(&mut self) {
+        self.playing = false;
+        self.finished = true;
+        for ch in &mut self.channels {
+            ch.release(&self.song.instruments);
+        }
+    }
+
     fn advance_row(&mut self) {
         if let Some(jump) = self.pending_jump.take() {
             if jump.order <= self.order {
@@ -769,6 +830,10 @@ impl Player {
             return;
         }
         self.row = 0;
+        if let Some(order) = self.queued.take() {
+            self.order = order;
+            return;
+        }
         if self.loop_pattern {
             return;
         }
@@ -1133,6 +1198,62 @@ pub(crate) mod tests {
         p.preview_off(1);
         p.run_tick();
         assert_eq!(p.voices()[1], None);
+    }
+
+    fn two_patterns(len: u16) -> Song {
+        let mut song = Song {
+            pattern_length: len,
+            ..Song::default()
+        };
+        song.patterns = vec![vec![[Cell::EMPTY; CHANNELS]; len as usize]; 3];
+        song.order = vec![0, 1, 2];
+        song
+    }
+
+    #[test]
+    fn tempo_scale_speeds_up_ticks() {
+        let mut p = started(Song::default());
+        p.set_tempo_scale(2.0);
+        let ticks_run: usize = (0..800 * 6).map(|_| p.clock(SR) as usize).sum();
+        // 60 ticks/s doubled: 800 samples now hold two ticks.
+        assert_eq!(ticks_run, 12);
+        p.set_tempo_scale(f64::NAN);
+        assert_eq!(p.tempo_scale(), 1.0);
+        p.set_tempo_scale(100.0);
+        assert_eq!(p.tempo_scale(), 4.0);
+    }
+
+    #[test]
+    fn play_once_stops_at_the_end_and_reports_it() {
+        let mut song = two_patterns(2);
+        song.order = vec![0];
+        song.patterns[0][0][0] = Cell::note(60, 0);
+        let mut p = started(song);
+        p.set_play_once(true);
+        ticks(&mut p, 12);
+        assert!(p.is_playing());
+        assert!(!p.take_finished());
+        ticks(&mut p, 1);
+        assert!(!p.is_playing());
+        assert!(p.take_finished());
+        assert!(!p.take_finished(), "reported once");
+        assert_eq!(p.loops(), 0);
+    }
+
+    #[test]
+    fn queued_order_switches_at_the_end_of_the_pattern() {
+        let mut p = started(two_patterns(4));
+        ticks(&mut p, 6);
+        p.queue_order(2);
+        ticks(&mut p, 6 * 2);
+        assert_eq!(
+            p.position(),
+            Some(Position { order: 0, row: 3 }),
+            "still finishing the pattern"
+        );
+        ticks(&mut p, 6);
+        assert_eq!(p.position(), Some(Position { order: 2, row: 0 }));
+        assert_eq!(p.queued_order(), None);
     }
 
     #[test]

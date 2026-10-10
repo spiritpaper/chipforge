@@ -1,0 +1,12 @@
+[package]
+name = "chipforge"
+version = "0.1.0"
+edition = "2024"
+description = "ChipForge's chip and tracker player as a C library for game engines"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+chipcore = { path = "../core" }
