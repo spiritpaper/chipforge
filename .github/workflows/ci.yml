@@ -120,3 +120,17 @@ jobs:
           dotnet-version: '10.0.x'
       # The C# wrapper against the native library; the Unity-only parts need Unity.
       - run: engines/unity/test.sh
+
+  self-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the stack
+        working-directory: deploy
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+      - run: deploy/smoke.sh http://localhost:8080
+      - if: failure()
+        working-directory: deploy
+        run: docker compose logs
