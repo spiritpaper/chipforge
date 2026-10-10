@@ -6,7 +6,7 @@ for your games.
 - [Product & build plan](docs/PLAN.md)
 - [Design system](docs/DESIGN.md)
 
-**Status:** Phase 3 is done.
+**Status:** Phase 4 is done.
 
 - **SFX Lab** makes game sound effects: ten seeded presets plus random, mutate,
   fine-tune sliders, a history with kept sounds, WAV and zip export, share links.
@@ -18,31 +18,46 @@ for your games.
   and **Chip version** transcribes its notes, beat and drums (Basic Pitch on your GPU
   via WebGL) and rebuilds it as an editable chip song. Nothing is uploaded.
 
-Everything runs in the browser and works offline after the first visit.
+- **Game engines** play songs live from tiny `.chipsong` files, with adaptive music
+  (switch section on the bar line, mute layers, change tempo, play-once jingles):
+  a [Godot 4 plugin](engines/godot/README.md), a [Unity package](engines/unity/README.md)
+  and a [C library](native/include/chipforge.h) for everything else. Songs also export
+  as VGM (NES register logs for VGM players) and FamiTracker text.
+
+The web app runs in the browser and works offline after the first visit.
 
 ## Layout
 
 | Path | What |
 |------|------|
-| `core/` | `chipcore`: the Rust sound chip (2 pulse, triangle, noise, APU mixer), tracker sequencer (`tracker.rs`, which also documents the song binary format) and SFX synth. Builds natively and to WASM. |
+| `core/` | `chipcore`: the Rust sound chip (2 pulse, triangle, noise, APU mixer), tracker sequencer (`tracker.rs`, which also documents the `.chipsong` binary format), SFX synth and VGM export. Builds natively and to WASM. |
+| `native/` | `chipforge`: the player as a C library (`include/chipforge.h`) for engines and native apps. |
+| `engines/godot/` | Godot 4 GDExtension (Rust): `ChipSongPlayer` node, `.chipsong` resources, demo project. |
+| `engines/unity/` | Unity package: C# wrapper, `ChipSongPlayer` component, `.chipsong` importer. |
 | `web/` | Svelte 5 + Vite app. `src/audio/` hosts the chip in an AudioWorklet. |
-| `api/` | FastAPI service. It's a stub for now; conversion jobs arrive in Phase 3. |
+| `api/` | FastAPI service stub, kept for optional server-side conversion (Phase 3b). |
 | `docs/` | Plan and design system. |
 
 ## Requirements
 
 Rust (stable) with `rustup target add wasm32-unknown-unknown`, Node 24 with pnpm, and
-[uv](https://docs.astral.sh/uv/) for the API.
+[uv](https://docs.astral.sh/uv/) for the API. Optional, for the engine and export
+checks: a C compiler, Godot 4.3+, the .NET SDK, and libvgm's `vgm2wav`
+(`VGM2WAV=/path/to/vgm2wav`).
 
 ## Commands
 
 ```sh
 pnpm install
 pnpm dev              # builds the WASM core, then starts the app at http://localhost:5173
-pnpm test             # Rust, web and API tests
+pnpm test             # Rust workspace, web and API tests
 pnpm build && pnpm --filter web e2e   # end-to-end checks in headless Chrome
 
-cd core && cargo run --release --example render_song -- song.cfs song.wav   # render an encoded song offline
+cargo run --release -p chipcore --example render_song -- song.chipsong song.wav   # render offline
+cargo run --release -p chipcore --example export_vgm -- song.chipsong song.vgm    # NES VGM
+native/tests/c/run.sh                 # the C header against the shared library
+engines/godot/test.sh                 # Godot plugin, headless (GODOT=/path/to/godot)
+engines/unity/test.sh                 # Unity C# wrapper (needs the .NET SDK)
 cd api && uv run uvicorn app.main:app --reload                     # run the API
 ```
 

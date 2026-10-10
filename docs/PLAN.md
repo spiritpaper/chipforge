@@ -145,16 +145,29 @@ remedies.
 
 ---
 
-## Phase 4 — Game-dev integration (3–4 weeks)
+## Phase 4 — Game-dev integration (3–4 weeks) — built
 
-1. **Export packs**: zip with OGG/WAV, loop points (`LOOPSTART/LOOPLENGTH` tags), and a
-   manifest; naming conventions configurable.
-2. **Native core build**: `chipcore` as a C library (static/dynamic) for desktop/mobile.
-3. **Godot plugin** (GDExtension): `ChipSongPlayer` node plays `.chipsong` files live;
-   tiny files, dynamic mute/tempo for adaptive music.
-4. **Unity plugin** (native plugin + C# wrapper) with the same API.
-5. **Retro formats**: NSF export (real NES playback), VGM, FamiTracker text import/export.
-6. **Docs site** with copy-pasteable snippets for each engine.
+Built:
+1. **Engine file**: Compose exports `.chipsong`, the core's compact binary song format
+   (First Light is 1.4 KB). Audio exports (WAV `smpl`, OGG `LOOPSTART`) came in Phase 2.
+2. **Native library** (`native/`): a C API with a hand-written header, as cdylib and
+   staticlib, plus adaptive controls added to the core: switch section at the end of
+   the current pattern, per-channel mute, tempo scale, play once with a finished
+   signal, master volume. A C program compiled with `-Werror` plays a song through it.
+3. **Godot plugin** (`engines/godot/`, Rust GDExtension, Godot 4.3+): `ChipSongPlayer`
+   node and `.chipsong` resources; 12 headless checks pass in Godot 4.7.2.
+4. **Unity package** (`engines/unity/`): the C# wrapper is compiled and tested with
+   .NET against the native library (14 checks, including cross-thread control). The
+   MonoBehaviour and importer need Unity and haven't run there yet.
+5. **Retro formats**: VGM export (checked with libvgm, an independent NES APU
+   emulator: correct pitch and loop point) and FamiTracker text export (format-tested;
+   not opened in FamiTracker itself, a Windows program).
+6. **Docs**: each engine has a README with copy-paste snippets (instead of a docs site).
+
+Not done:
+- **NSF export** needs a 6502 sound driver and bank switching; deferred.
+- **FamiTracker import**, and prebuilt plugin binaries for Windows and macOS (CI builds
+  and tests on Linux only).
 
 ---
 
