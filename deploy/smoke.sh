@@ -8,6 +8,13 @@ here=$(cd "$(dirname "$0")" && pwd)
 jar=$(mktemp)
 trap 'rm -f "$jar"' EXIT
 
+# Containers report "started" before Caddy and the API accept connections.
+tries=0
+until curl -fsS -o /dev/null "$base/api/health" 2>/dev/null; do
+  tries=$((tries + 1))
+  [ "$tries" -lt 60 ] || { echo "nothing answered at $base within 60 s"; exit 1; }
+  sleep 1
+done
 echo "app:    $(curl -fsS "$base/" | grep -o '<title>[^<]*</title>')"
 echo "health: $(curl -fsS "$base/api/health")"
 email="smoke-$(date +%s)@example.com"
