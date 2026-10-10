@@ -1,0 +1,4 @@
+# Native libraries, built by engines/unity/build.sh (or CI):
+#   x86_64/libchipforge.so, x86_64/chipforge.dll, libchipforge.dylib
+*
+!.gitignore

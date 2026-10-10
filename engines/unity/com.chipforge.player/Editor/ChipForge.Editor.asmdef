@@ -1,0 +1,7 @@
+{
+  "name": "ChipForge.Editor",
+  "rootNamespace": "ChipForge.Editor",
+  "references": ["ChipForge.Runtime"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false
+}

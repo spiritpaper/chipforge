@@ -1,0 +1,6 @@
+{
+  "name": "ChipForge.Runtime",
+  "rootNamespace": "ChipForge",
+  "references": [],
+  "autoReferenced": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "com.chipforge.player",
+  "version": "0.1.0",
+  "displayName": "ChipForge Player",
+  "description": "Plays ChipForge .chipsong files live on an emulated NES sound chip, with adaptive controls: sections on the bar line, channel layers, tempo, jingles.",
+  "unity": "2021.3",
+  "license": "MIT",
+  "keywords": ["chiptune", "music", "nes", "audio", "adaptive music"]
+}
