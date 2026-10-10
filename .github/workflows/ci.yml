@@ -72,3 +72,26 @@ jobs:
         with:
           name: e2e-screenshots
           path: web/e2e/.tmp/*.png
+
+  godot:
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: 4.7.2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}
+      - name: Download Godot
+        run: |
+          if [ ! -x ~/godot/godot ]; then
+            mkdir -p ~/godot && cd ~/godot
+            zip=Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+            curl -sSLO https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/$zip
+            curl -sSL https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/SHA512-SUMS.txt | grep " $zip$" | sha512sum -c -
+            unzip -q $zip && mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 godot && rm $zip
+          fi
+      - run: GODOT=~/godot/godot engines/godot/test.sh

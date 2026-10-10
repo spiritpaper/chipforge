@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "native"]
+members = ["core", "native", "engines/godot/rust"]
 resolver = "3"
 
 # The browser build: small and with no unwinding machinery.

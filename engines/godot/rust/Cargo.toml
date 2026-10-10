@@ -1,0 +1,13 @@
+[package]
+name = "chipforge-godot"
+version = "0.1.0"
+edition = "2024"
+description = "ChipForge songs for Godot 4: a ChipSongPlayer node and .chipsong resources"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+chipcore = { path = "../../../core" }
+godot = { version = "0.5.5", features = ["api-4-3"] }

@@ -1,0 +1,22 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://main.gd" id="1"]
+[ext_resource type="ChipSong" path="res://songs/overworld.chipsong" id="2"]
+[ext_resource type="ChipSong" path="res://songs/victory.chipsong" id="3"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1")
+
+[node name="Music" type="ChipSongPlayer" parent="."]
+song = ExtResource("2")
+autoplay = true
+
+[node name="Jingle" type="ChipSongPlayer" parent="."]
+song = ExtResource("3")
+play_once = true
+
+[node name="Label" type="Label" parent="."]
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 900.0
+offset_bottom = 200.0

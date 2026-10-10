@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
-    "e2e": "node e2e/run.mjs"
+    "e2e": "node e2e/run.mjs",
+    "export-templates": "tsx scripts/export-templates.ts"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
@@ -21,6 +22,7 @@
     "puppeteer-core": "^25.12.0",
     "svelte": "^5.57.1",
     "svelte-check": "^4.7.6",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
