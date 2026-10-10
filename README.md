@@ -19,6 +19,8 @@ for your games.
   and **Chip version** transcribes its notes, beat and drums (Basic Pitch on your GPU
   via WebGL) and rebuilds it as an editable chip song. Nothing is uploaded.
 
+- **Desktop app** for Linux, Windows and macOS: the same app offline in a native
+  window, with native Save dialogs ([desktop/](desktop/README.md)).
 - **Game engines** play songs live from tiny `.chipsong` files, with adaptive music
   (switch section on the bar line, mute layers, change tempo, play-once jingles):
   a [Godot 4 plugin](engines/godot/README.md), a [Unity package](engines/unity/README.md)

@@ -1,0 +1,13 @@
+{
+  "name": "chipforge-desktop",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "tauri": "tauri",
+    "build": "pnpm --filter web build && tauri build",
+    "dev": "tauri dev"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0"
+  }
+}

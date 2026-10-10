@@ -1,5 +1,6 @@
 **/node_modules
 target
+desktop/src-tauri/target
 web/dist
 web/e2e/.tmp
 web/src/audio/chipcore.wasm
