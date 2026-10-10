@@ -279,3 +279,37 @@ pub extern "C" fn sfx_preset_key(i: u32) -> *const u8 {
 pub extern "C" fn sfx_preset_key_len(i: u32) -> u32 {
     sfx::PRESETS[(i as usize).min(sfx::PRESETS.len() - 1)].len() as u32
 }
+
+/// Exports an encoded song as a VGM file (see `vgm`). Read the result with
+/// [`bytes_ptr`]/[`bytes_len`] and release it with [`bytes_free`]; null if the song
+/// doesn't decode.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vgm_render(
+    ptr: *const u8,
+    len: u32,
+    title: *const u8,
+    title_len: u32,
+) -> *mut Vec<u8> {
+    let Ok(song) = Song::decode(unsafe { bytes(ptr, len) }) else {
+        return std::ptr::null_mut();
+    };
+    let title = String::from_utf8_lossy(unsafe { bytes(title, title_len) }).into_owned();
+    Box::into_raw(Box::new(crate::vgm::render_vgm(song, &title)))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn bytes_ptr(b: *const Vec<u8>) -> *const u8 {
+    unsafe { &*b }.as_ptr()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn bytes_len(b: *const Vec<u8>) -> u32 {
+    unsafe { &*b }.len() as u32
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn bytes_free(b: *mut Vec<u8>) {
+    if !b.is_null() {
+        drop(unsafe { Box::from_raw(b) });
+    }
+}

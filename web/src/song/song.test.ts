@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { instantiateChip, renderSong, unpackPosition, withBytes, type ChipExports } from '../audio/chip-wasm'
+import { instantiateChip, renderSong, renderVgm, unpackPosition, withBytes, type ChipExports } from '../audio/chip-wasm'
 import { buildPattern, parseTrack } from './build'
 import { encodeSong } from './encode'
 import { EMPTY_CELL, NOTE_OFF, NOTE_RELEASE, emptySong, noteLabel, parseNote, songSeconds, type Song } from './model'
@@ -98,6 +98,16 @@ describe('songs on the real chip (WASM)', () => {
     expect(r.looped).toBe(true)
     expect(r.samples.length / 44_100).toBeCloseTo(2 * pattern, 2)
     expect(r.loopStart / 44_100).toBeCloseTo(pattern, 2)
+  })
+
+  it('exports VGM files from the browser build', () => {
+    const vgm = renderVgm(wasm, encodeSong(firstLight()), 'First Light')!
+    const view = new DataView(vgm.buffer)
+    expect(new TextDecoder().decode(vgm.subarray(0, 4))).toBe('Vgm ')
+    expect(view.getUint32(0x84, true)).toBe(1_789_772)
+    // One pass of 64 rows at 140 BPM, speed 6: 6.857 s.
+    expect(view.getUint32(0x18, true) / 44_100).toBeCloseTo(6.857, 2)
+    expect(renderVgm(wasm, new Uint8Array([1, 2]), '')).toBeNull()
   })
 
   it('returns null when asked to render garbage', () => {

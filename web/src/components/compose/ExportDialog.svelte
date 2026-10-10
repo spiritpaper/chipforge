@@ -7,6 +7,7 @@
   import { toast } from '../../lib/toast.svelte'
   import { loadChipModule } from '../../audio/wasm'
   import { encodeSong } from '../../song/encode'
+  import { instantiateChip, renderVgm } from '../../audio/chip-wasm'
   import RenderWorker from '../../export/render-worker.ts?worker'
   import type { RenderRequest, RenderResponse } from '../../export/render-worker'
   import type { AudioFormat, Ending } from '../../export/audio'
@@ -83,6 +84,17 @@
     toast.show(`Saved ${base}.chipsong`)
   }
 
+  async function exportVgm() {
+    const wasm = await instantiateChip(await loadChipModule())
+    const bytes = renderVgm(wasm, encodeSong(composer.song), composer.song.title)
+    if (!bytes) {
+      toast.show('This song could not be converted to VGM.')
+      return
+    }
+    download(bytes, `${base}.vgm`, 'application/octet-stream')
+    toast.show(`Saved ${base}.vgm`)
+  }
+
   function exportSongFile() {
     download(JSON.stringify(composer.song), `${base}.chipsong.json`, 'application/json')
     toast.show(`Saved ${base}.chipsong.json`)
@@ -132,6 +144,15 @@
       {(engineBytes / 1024).toFixed(1)} KB.
     </p>
     <button class="key" onclick={exportEngineFile}>Download {base}.chipsong</button>
+  </section>
+
+  <section>
+    <h3>VGM file</h3>
+    <p>
+      The song as writes to a real NES sound chip, for VGM players (VGMPlay, foobar2000) and
+      chiptune archives. Loops where the song loops.
+    </p>
+    <button class="key" onclick={exportVgm}>Download {base}.vgm</button>
   </section>
 
   <section>

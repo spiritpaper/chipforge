@@ -14,6 +14,13 @@ jobs:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+      # libvgm's vgm2wav: an independent NES APU emulator to check VGM export against.
+      - name: Build vgm2wav
+        run: |
+          git clone --depth 1 https://github.com/ValleyBell/libvgm ~/libvgm
+          cmake -S ~/libvgm -B ~/libvgm/build -DCMAKE_BUILD_TYPE=Release -DBUILD_PLAYER=OFF -DBUILD_VGM2WAV=ON -DBUILD_LIBAUDIO=OFF -DBUILD_TESTS=OFF
+          cmake --build ~/libvgm/build -j4
+          echo "VGM2WAV=$HOME/libvgm/build/bin/vgm2wav" >> "$GITHUB_ENV"
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace

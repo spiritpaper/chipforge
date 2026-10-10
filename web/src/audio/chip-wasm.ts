@@ -27,6 +27,11 @@ export interface ChipExports {
   rendered_looped(r: number): number
   rendered_free(r: number): void
 
+  vgm_render(ptr: number, len: number, title: number, titleLen: number): number
+  bytes_ptr(b: number): number
+  bytes_len(b: number): number
+  bytes_free(b: number): void
+
   sfx_new(): number
   sfx_free(ws: number): void
   sfx_params(ws: number): number
@@ -85,5 +90,17 @@ export function renderSong(wasm: ChipExports, encoded: Uint8Array, sampleRate: n
     }
   } finally {
     wasm.rendered_free(r)
+  }
+}
+
+/** A song as a VGM file (NES APU register log), or null if it doesn't decode. */
+export function renderVgm(wasm: ChipExports, encoded: Uint8Array, title: string): Uint8Array<ArrayBuffer> | null {
+  const titleBytes = new TextEncoder().encode(title)
+  const b = withBytes(wasm, encoded, (sp, sl) => withBytes(wasm, titleBytes, (tp, tl) => wasm.vgm_render(sp, sl, tp, tl)))
+  if (b === 0) return null
+  try {
+    return new Uint8Array(wasm.memory.buffer, wasm.bytes_ptr(b), wasm.bytes_len(b)).slice()
+  } finally {
+    wasm.bytes_free(b)
   }
 }
