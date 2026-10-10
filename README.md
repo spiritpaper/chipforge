@@ -94,3 +94,16 @@ Compose (tracker focused):
 
 Anywhere in Compose: Space plays or stops, Ctrl+Z / Ctrl+Shift+Z undo and redo,
 and ` switches between tracker and piano roll.
+
+## Contributing
+
+Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md). Report security problems privately as described
+in [SECURITY.md](SECURITY.md).
+
+## License
+
+The sound engine, C library and engine plugins (`core/`, `native/`, `engines/`) are
+MIT, so you can ship them in any game. The app and server are AGPL-3.0. Music and
+sounds you make with ChipForge are yours. Details: [LICENSING.md](LICENSING.md);
+bundled third-party work: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

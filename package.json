@@ -6,5 +6,6 @@
     "build": "pnpm --filter web build",
     "test": "cargo test --workspace && pnpm --filter web test && cd api && uv run pytest"
   },
+  "license": "AGPL-3.0-only",
   "packageManager": "pnpm@11.22.0"
 }
