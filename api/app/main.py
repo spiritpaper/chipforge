@@ -13,14 +13,16 @@ from datetime import timedelta
 from time import monotonic
 from typing import Annotated, Any
 
-from fastapi import Body, Cookie, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Body, Cookie, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
+from .billing import Gateway, GatewayError, ZarinPal
 from .config import Settings, get_settings
-from .db import LoginToken, Session, SfxLibrary, Song, User, make_sessionmaker, now
+from .db import LoginToken, Payment, Session, SfxLibrary, Song, User, make_sessionmaker, now
 from .mail import send_sign_in
+from .plans import Plan, extend, load_plans
 from .validate import song_problem
 
 COOKIE = "chipforge_session"
@@ -35,9 +37,12 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, gateway: Gateway | None = None) -> FastAPI:
     settings = settings or get_settings()
     sessions = make_sessionmaker(settings.database_url)
+    plans = load_plans(settings.billing_enabled, settings.plans_file or None)
+    if gateway is None and settings.zarinpal_merchant_id:
+        gateway = ZarinPal(settings.zarinpal_merchant_id, sandbox=settings.zarinpal_sandbox)
     ip_requests: dict[str, deque[float]] = defaultdict(deque)
     app = FastAPI(
         title="ChipForge API",
@@ -143,15 +148,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         return response
 
+    def billing_info() -> dict[str, Any]:
+        return {
+            "enabled": plans.enabled,
+            "currency": plans.currency,
+            "checkout": plans.enabled and gateway is not None,
+            "plans": [p.public() for p in plans.plans.values()] if plans.enabled else [],
+        }
+
+    def song_count(s: DbSession, user: User) -> int:
+        return s.scalar(select(func.count()).select_from(Song).where(Song.user_id == user.id)) or 0
+
     @app.get("/api/me")
-    def me(
-        s: Db, session: Annotated[str | None, Cookie(alias=COOKIE)] = None
-    ) -> dict[str, str | None]:
-        """Who is signed in; {"email": null} when nobody is (not an error)."""
+    def me(s: Db, session: Annotated[str | None, Cookie(alias=COOKIE)] = None) -> dict[str, Any]:
+        """Who is signed in and on which plan; {"email": null} when nobody is."""
         try:
-            return {"email": current_user(s, session).email}
+            user = current_user(s, session)
         except HTTPException:
-            return {"email": None}
+            return {"email": None, "billing": billing_info()}
+        plan = plans.effective(user)
+        paid_until = (
+            user.plan_until.isoformat() if plan.id == user.plan and user.plan_until else None
+        )
+        return {
+            "email": user.email,
+            "plan": {**plan.public(), "until": paid_until},
+            "usage": {"songs": song_count(s, user)},
+            "billing": billing_info(),
+        }
+
+    def over_limit(message: str, limit: str) -> JSONResponse:
+        return JSONResponse({"detail": message, "limit": limit}, status_code=402)
+
+    def songs_limit_message(plan: Plan) -> str:
+        return (
+            f"Your {plan.name} plan syncs up to {plan.max_songs} songs. This one stays on this "
+            "device; upgrade to sync more."
+        )
 
     @app.post("/api/auth/logout", dependencies=[SameOrigin])
     def logout(
@@ -205,6 +238,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if problem := song_problem(song):
             raise HTTPException(422, f"Not a valid song: {problem}.")
         row = find_song(s, user, song_id)
+        plan = plans.effective(user)
+        if not row and plan.max_songs is not None and song_count(s, user) >= plan.max_songs:
+            return over_limit(songs_limit_message(plan), "songs")
         if row and base != row.version:
             # Changed elsewhere since this browser last saw it: send the server copy back.
             return JSONResponse(
@@ -228,7 +264,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # ---- sharing ----------------------------------------------------------------
 
     @app.post("/api/songs/{song_id}/share", dependencies=[SameOrigin])
-    def share(s: Db, user: CurrentUser, song_id: str) -> dict[str, str]:
+    def share(s: Db, user: CurrentUser, song_id: str) -> Any:
+        plan = plans.effective(user)
+        if not plan.share:
+            return over_limit(f"Share links come with a paid plan; you're on {plan.name}.", "share")
         row = find_song(s, user, song_id)
         if not row:
             raise HTTPException(404, "Sync the song before sharing it.")
@@ -283,5 +322,78 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             s.add(row)
         s.commit()
         return {"version": row.version}
+
+    # ---- billing ----------------------------------------------------------------
+
+    @app.post("/api/billing/checkout", dependencies=[SameOrigin])
+    def checkout(
+        s: Db,
+        user: CurrentUser,
+        plan_id: Annotated[str, Body(alias="plan")],
+        period: Annotated[str, Body()],
+    ) -> dict[str, str]:
+        if not plans.enabled or gateway is None:
+            raise HTTPException(503, "Payments aren't set up on this server.")
+        plan = plans.plans.get(plan_id)
+        amount = plan.prices.get(period) if plan else None
+        if not plan or not amount:
+            raise HTTPException(422, "No such plan or period.")
+        payment = Payment(
+            user_id=user.id, plan=plan.id, period=period, amount=amount, provider=gateway.name
+        )
+        s.add(payment)
+        s.flush()
+        try:
+            reference, url = gateway.start(
+                amount,
+                f"ChipForge {plan.name}, one {period}",
+                f"{settings.app_origin}/api/billing/{gateway.name}/callback",
+                user.email,
+            )
+        except GatewayError as e:
+            s.rollback()
+            raise HTTPException(502, str(e)) from e
+        payment.reference = reference
+        s.commit()
+        return {"url": url}
+
+    def back_to_account(result: str) -> RedirectResponse:
+        return RedirectResponse(
+            f"{settings.app_origin}/#/account?payment={result}", status_code=303
+        )
+
+    @app.get("/api/billing/zarinpal/callback")
+    def zarinpal_callback(
+        s: Db,
+        authority: Annotated[str, Query(alias="Authority")],
+        status: Annotated[str, Query(alias="Status")] = "",
+    ) -> Response:
+        payment = s.scalar(
+            select(Payment).where(Payment.reference == authority, Payment.provider == "zarinpal")
+        )
+        if not payment or gateway is None or gateway.name != "zarinpal":
+            return back_to_account("unknown")
+        if payment.status == "paid":
+            return back_to_account("ok")
+        if status != "OK":
+            payment.status = "cancelled"
+            s.commit()
+            return back_to_account("cancelled")
+        try:
+            # The amount comes from our record, never from the callback.
+            verified = gateway.verify(authority, payment.amount)
+        except GatewayError:
+            # Left pending: coming back to this link verifies again.
+            return back_to_account("error")
+        if not verified.ok:
+            payment.status = "failed"
+            s.commit()
+            return back_to_account("failed")
+        user = s.get(User, payment.user_id)
+        if user:
+            extend(user, payment.plan, payment.period)
+        payment.status, payment.receipt, payment.paid_at = "paid", verified.receipt, now()
+        s.commit()
+        return back_to_account("ok")
 
     return app

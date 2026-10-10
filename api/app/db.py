@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy import (
     JSON,
@@ -29,6 +30,27 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    # A paid plan and when it runs out; "free" (or an expired date) means the free plan.
+    plan: Mapped[str] = mapped_column(String(32), default="free", server_default="free")
+    plan_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Payment(Base):
+    """One checkout. Amounts are in the gateway's currency unit (Rial for ZarinPal)."""
+
+    __tablename__ = "payments"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    plan: Mapped[str] = mapped_column(String(32))
+    period: Mapped[str] = mapped_column(String(16))
+    amount: Mapped[int] = mapped_column(Integer)
+    provider: Mapped[str] = mapped_column(String(32))
+    # The gateway's id for this checkout (ZarinPal: "authority").
+    reference: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    receipt: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class LoginToken(Base):
@@ -75,8 +97,19 @@ class SfxLibrary(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 
 
+def migrate(url: str) -> None:
+    """Brings the database schema up to date (creating it on first run)."""
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(Path(__file__).parent / "migrations"))
+    cfg.set_main_option("sqlalchemy.url", url)
+    command.upgrade(cfg, "head")
+
+
 def make_sessionmaker(url: str):
+    migrate(url)
     args = {"check_same_thread": False} if url.startswith("sqlite") else {}
     engine = create_engine(url, connect_args=args)
-    Base.metadata.create_all(engine)
     return sessionmaker(engine, expire_on_commit=False)

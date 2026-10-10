@@ -29,6 +29,21 @@ class Settings:
     mail_file: str = field(default_factory=lambda: os.environ.get("MAIL_FILE", ""))
     song_max_bytes: int = field(default_factory=lambda: _int("SONG_MAX_BYTES", 2_000_000))
     session_days: int = field(default_factory=lambda: _int("SESSION_DAYS", 60))
+    # Hosted-service plans. Off by default: a self-hosted server gives everyone everything.
+    billing_enabled: bool = field(
+        default_factory=lambda: (
+            os.environ.get("BILLING_ENABLED", "").lower() in {"1", "true", "yes"}
+        )
+    )
+    plans_file: str = field(default_factory=lambda: os.environ.get("PLANS_FILE", ""))
+    zarinpal_merchant_id: str = field(
+        default_factory=lambda: os.environ.get("ZARINPAL_MERCHANT_ID", "")
+    )
+    zarinpal_sandbox: bool = field(
+        default_factory=lambda: (
+            os.environ.get("ZARINPAL_SANDBOX", "").lower() in {"1", "true", "yes"}
+        )
+    )
 
     @property
     def secure_cookies(self) -> bool:
