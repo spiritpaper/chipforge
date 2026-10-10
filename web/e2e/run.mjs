@@ -35,7 +35,34 @@ async function main() {
   const all = fs.readdirSync(path.join(here, 'scenarios')).filter((f) => f.endsWith('.mjs')).map((f) => f.slice(0, -4)).sort()
   const wanted = process.argv.slice(2).length ? process.argv.slice(2) : all
 
-  const server = spawn('pnpm', ['exec', 'vite', 'preview', '--port', String(PORT), '--strictPort'], { cwd: path.join(here, '..'), stdio: 'ignore' })
+  // The ChipForge server, when uv is available: a fresh database and a mail file the
+  // scenarios read sign-in links from. Without it the app runs serverless.
+  let api = null
+  const API_PORT = 8765
+  const mailFile = path.join(tmp, 'mail.txt')
+  try {
+    execFileSync('uv', ['--version'])
+    api = spawn('uv', ['run', '--project', path.join(here, '../../api'), 'uvicorn', 'app.main:create_app', '--factory', '--port', String(API_PORT)], {
+      cwd: path.join(here, '../../api'),
+      stdio: 'ignore',
+      env: { ...process.env, DATABASE_URL: `sqlite:///${path.join(tmp, 'e2e.db')}`, APP_ORIGIN: BASE, MAIL_FILE: mailFile },
+    })
+  } catch {
+    console.log('(uv not found: running without the ChipForge server)')
+  }
+  const server = spawn('pnpm', ['exec', 'vite', 'preview', '--port', String(PORT), '--strictPort'], {
+    cwd: path.join(here, '..'),
+    stdio: 'ignore',
+    env: { ...process.env, CHIPFORGE_API: `http://localhost:${API_PORT}` },
+  })
+  if (api) {
+    for (let i = 0; i < 100; i++) {
+      try {
+        if ((await fetch(`http://localhost:${API_PORT}/api/health`)).ok) break
+      } catch {}
+      await sleep(200)
+    }
+  }
   for (let i = 0; i < 50; i++) {
     try {
       if ((await fetch(BASE)).ok) break
@@ -65,7 +92,7 @@ async function main() {
 
       const checks = []
       const ctx = {
-        page, context, sleep, BASE, tmp, downloads,
+        page, context, sleep, BASE, tmp, downloads, browser, mailFile, hasServer: Boolean(api),
         shot: (file) => page.screenshot({ path: path.join(tmp, `${name}-${file}.png`) }),
         /** Records a check; `ok` decides pass or fail. */
         check: (label, ok, detail = '') => checks.push({ label, ok: Boolean(ok), detail }),
@@ -87,6 +114,7 @@ async function main() {
   } finally {
     await browser.close()
     server.kill()
+    api?.kill()
   }
   console.log(`\n${failed ? `${failed} check(s) failed` : 'All checks passed'}`)
   process.exit(failed ? 1 : 0)

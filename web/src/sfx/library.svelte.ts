@@ -16,6 +16,22 @@ class SfxLibrary {
   keptCount = $derived(this.entries.filter((e) => e.starred).length)
 
   private saveTimer: ReturnType<typeof setTimeout> | undefined
+  private listeners = new Set<() => void>()
+
+  /** Called after local changes are saved (not after sync applies remote ones). */
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  /** Replaces the library with a synced copy, without reporting it as a local change. */
+  async applyRemote(entries: SfxEntry[]) {
+    this.entries = prune(entries)
+    if (!this.entries.some((e) => e.id === this.selectedId)) this.selectedId = this.entries[0]?.id ?? null
+    clearTimeout(this.saveTimer)
+    const snapshot = $state.snapshot({ entries: this.entries, selectedId: this.selectedId })
+    await set(STORAGE_KEY, snapshot).catch(() => {})
+  }
 
   async load() {
     try {
@@ -66,7 +82,9 @@ class SfxLibrary {
     clearTimeout(this.saveTimer)
     this.saveTimer = setTimeout(() => {
       const snapshot = $state.snapshot({ entries: this.entries, selectedId: this.selectedId })
-      set(STORAGE_KEY, snapshot).catch(() => {})
+      set(STORAGE_KEY, snapshot)
+        .then(() => this.listeners.forEach((l) => l()))
+        .catch(() => {})
     }, 300)
   }
 }

@@ -68,7 +68,8 @@ def sign_in(c: TestClient, mail, email: str = "Ada@Example.com") -> None:
 def test_sign_in_with_an_emailed_link(env):
     settings, mail = env
     c = client(settings)
-    assert c.get("/api/me").status_code == 401
+    assert c.get("/api/me").json() == {"email": None}
+    assert c.get("/api/songs").status_code == 401
     sign_in(c, mail)
     assert c.get("/api/me").json() == {"email": "ada@example.com"}
 
@@ -80,7 +81,7 @@ def test_links_work_once(env):
     other = client(settings)
     r = other.get(last_link(mail).replace(ORIGIN, ""), follow_redirects=False)
     assert r.headers["location"].endswith("#/account?error=link")
-    assert other.get("/api/me").status_code == 401
+    assert other.get("/api/me").json() == {"email": None}
 
 
 def test_expired_links_are_refused(env):
@@ -214,4 +215,5 @@ def test_sign_out_ends_the_session(env):
     c = client(settings)
     sign_in(c, mail)
     assert c.post("/api/auth/logout").status_code == 200
-    assert c.get("/api/me").status_code == 401
+    assert c.get("/api/me").json() == {"email": None}
+    assert c.get("/api/songs").status_code == 401

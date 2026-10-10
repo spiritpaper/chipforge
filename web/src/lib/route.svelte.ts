@@ -4,10 +4,14 @@ import { parseHash, type Mode } from './hash'
 
 class Route {
   mode = $state<Mode>(parseHash(location.hash).mode)
+  /** The shared song's slug on #/s/<slug>. */
+  slug = $state<string | null>(parseHash(location.hash).slug ?? null)
 
   constructor() {
     addEventListener('hashchange', () => {
-      this.mode = parseHash(location.hash).mode
+      const parsed = parseHash(location.hash)
+      this.mode = parsed.mode
+      this.slug = parsed.slug ?? null
     })
   }
 

@@ -144,8 +144,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     @app.get("/api/me")
-    def me(user: CurrentUser) -> dict[str, str]:
-        return {"email": user.email}
+    def me(
+        s: Db, session: Annotated[str | None, Cookie(alias=COOKIE)] = None
+    ) -> dict[str, str | None]:
+        """Who is signed in; {"email": null} when nobody is (not an error)."""
+        try:
+            return {"email": current_user(s, session).email}
+        except HTTPException:
+            return {"email": None}
 
     @app.post("/api/auth/logout", dependencies=[SameOrigin])
     def logout(

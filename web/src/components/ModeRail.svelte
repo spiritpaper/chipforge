@@ -17,6 +17,7 @@
     { label: 'Compose', icon: 'note', mode: 'compose' },
     { label: 'Convert', icon: 'convert', mode: 'convert' },
     { label: 'Library', icon: 'stack', mode: null, comingIn: 'Phase 5' },
+    { label: 'Account', icon: 'person', mode: 'account' },
   ]
 </script>
 

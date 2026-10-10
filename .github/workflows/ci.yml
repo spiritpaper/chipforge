@@ -73,6 +73,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter web build
+      # The account scenario runs the real API next to the app.
+      - uses: astral-sh/setup-uv@v6
       # GitHub's Ubuntu runners include Google Chrome.
       - run: pnpm --filter web e2e
       - if: failure()

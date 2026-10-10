@@ -13,6 +13,7 @@
   import type { RenderRequest, RenderResponse } from '../../export/render-worker'
   import type { AudioFormat, Ending } from '../../export/audio'
   import { readPref, writePref } from '../../lib/prefs'
+  import { account } from '../../account/account.svelte'
 
   let { open = $bindable(false) }: { open: boolean } = $props()
   let dialog: HTMLDialogElement
@@ -101,6 +102,30 @@
     toast.show(`Saved ${base}.famitracker.txt`)
   }
 
+  let shareUrl = $state<string | null>(null)
+  let sharing = $state(false)
+
+  async function share() {
+    if (!composer.projectId) return
+    sharing = true
+    try {
+      shareUrl = await account.share(composer.projectId)
+      await navigator.clipboard.writeText(shareUrl).catch(() => {})
+      toast.show('Share link copied.')
+    } catch (err) {
+      toast.show(`Couldn't share: ${err instanceof Error ? err.message : err}`)
+    } finally {
+      sharing = false
+    }
+  }
+
+  async function unshare() {
+    if (!composer.projectId) return
+    await account.unshare(composer.projectId)
+    shareUrl = null
+    toast.show('Share link turned off.')
+  }
+
   function exportSongFile() {
     download(JSON.stringify(composer.song), `${base}.chipsong.json`, 'application/json')
     toast.show(`Saved ${base}.chipsong.json`)
@@ -112,6 +137,23 @@
     <h2 id="export-title">Export “{composer.song.title}”</h2>
     <button class="key" onclick={() => (open = false)}>Close</button>
   </header>
+
+  <section aria-labelledby="share-title">
+    <h3 id="share-title">Share link</h3>
+    {#if account.status === 'signed-in'}
+      <p>Anyone with the link can play this song and copy it. Later edits show up at the same link.</p>
+      {#if shareUrl}
+        <input class="url" readonly value={shareUrl} aria-label="Share link" onfocus={(e) => e.currentTarget.select()} />
+        <button class="key" onclick={unshare}>Turn off the link</button>
+      {:else}
+        <button class="key" onclick={share} disabled={sharing}>{sharing ? 'Making a link…' : 'Create share link'}</button>
+      {/if}
+    {:else if account.status === 'signed-out'}
+      <p><a href="#/account" onclick={() => (open = false)}>Sign in</a> to share songs by link.</p>
+    {:else}
+      <p>Sharing needs a ChipForge server; this copy of the app runs without one.</p>
+    {/if}
+  </section>
 
   <section aria-labelledby="audio-title">
     <h3 id="audio-title">Audio</h3>
@@ -275,6 +317,20 @@
     border-radius: var(--radius-key);
     background: var(--ink);
     font: inherit;
+    color: var(--text);
+  }
+
+  .url {
+    width: 100%;
+    padding: var(--u) calc(var(--u) * 2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-key);
+    background: var(--ink);
+    font-family: var(--font-data);
+    font-size: var(--step--1);
+  }
+
+  a {
     color: var(--text);
   }
 

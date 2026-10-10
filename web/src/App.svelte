@@ -14,10 +14,15 @@
   import ChannelStrip from './components/ChannelStrip.svelte'
   import SfxLab from './components/sfx/SfxLab.svelte'
   import Toast from './components/Toast.svelte'
+  import AccountView from './components/account/AccountView.svelte'
+  import SharedView from './components/account/SharedView.svelte'
+  import { account } from './account/account.svelte'
   import { toast } from './lib/toast.svelte'
 
   $effect(() => {
     void lab.init(route.takeShareCode())
+    // Sync needs the composer's storage hooks in place first.
+    void composer.init().then(() => account.init())
   })
 
   // Each song screen hands the engine its own song; leaving stops the music. Only the
@@ -75,6 +80,7 @@
       }
       return
     }
+    if (route.mode !== 'sfx') return
     const shortcut = sfxShortcut(e.code, e.shiftKey)
     if (!shortcut || lab.status !== 'ready') return
     e.preventDefault()
@@ -113,6 +119,10 @@
     </section>
   {:else if route.mode === 'convert'}
     <ConvertView />
+  {:else if route.mode === 'account'}
+    <AccountView />
+  {:else if route.mode === 'shared' && route.slug}
+    <SharedView slug={route.slug} />
   {:else}
     <SfxLab />
   {/if}
