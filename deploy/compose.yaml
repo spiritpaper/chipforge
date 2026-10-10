@@ -1,0 +1,38 @@
+# Self-host ChipForge: `cp .env.example .env`, edit it, then `docker compose up -d`.
+name: chipforge
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    environment:
+      CHIPFORGE_SITE: ${CHIPFORGE_SITE:-:80}
+    volumes:
+      - caddy_data:/data
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    restart: unless-stopped
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-ChipForge <no-reply@localhost>}
+      MAIL_FILE: ${MAIL_FILE:-}
+    volumes:
+      - chipforge_data:/data
+
+volumes:
+  caddy_data:
+  chipforge_data:
