@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
-    "test": "cargo test --workspace && pnpm --filter web test && cd api && uv run pytest"
+    "test": "cargo test --workspace && pnpm --filter web test && cd api && uv run pytest",
+    "lockfile:clean": "node -e \"const f='pnpm-lock.yaml',fs=require('fs');fs.writeFileSync(f,fs.readFileSync(f,'utf8').replace(/, tarball: https?:\\/\\/[^}]*/g,''))\""
   },
+  "license": "AGPL-3.0-only",
   "packageManager": "pnpm@11.22.0"
 }

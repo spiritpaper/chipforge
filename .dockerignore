@@ -1,0 +1,13 @@
+**/node_modules
+target
+desktop/src-tauri/target
+web/dist
+web/e2e/.tmp
+web/src/audio/chipcore.wasm
+api/.venv
+**/__pycache__
+**/*.db
+engines/godot/project/.godot
+engines/unity/tests/bin
+engines/unity/tests/obj
+.git

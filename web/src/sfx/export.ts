@@ -1,6 +1,8 @@
 import { strToU8, zipSync, type Zippable } from 'fflate'
 import { encodeWav } from './wav'
 import { uniqueFileNames, type SfxEntry } from './library-core'
+import { isDesktop, saveFile } from '../lib/desktop'
+import { toast } from '../lib/toast.svelte'
 
 export interface RenderedSound {
   entry: SfxEntry
@@ -28,6 +30,11 @@ export function zipSounds(sounds: RenderedSound[], sampleRate: number): Uint8Arr
 }
 
 export function download(data: BlobPart, filename: string, type: string) {
+  if (isDesktop) {
+    // Webviews don't save <a download> links; the desktop app opens a Save dialog.
+    saveFile(data, filename).catch((err) => toast.show(`Couldn't save ${filename}: ${err}`))
+    return
+  }
   const url = URL.createObjectURL(new Blob([data], { type }))
   const a = Object.assign(document.createElement('a'), { href: url, download: filename })
   a.click()

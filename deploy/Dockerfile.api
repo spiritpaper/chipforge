@@ -1,0 +1,16 @@
+# The ChipForge server: accounts, sync and share links. Data lives in /data.
+
+FROM python:3.13-slim
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+WORKDIR /app
+COPY api/pyproject.toml api/uv.lock ./
+RUN uv sync --locked --no-dev --no-install-project
+COPY api/app ./app
+ENV DATABASE_URL=sqlite:////data/chipforge.db \
+    PATH=/app/.venv/bin:$PATH
+VOLUME /data
+EXPOSE 8000
+# Only Caddy reaches this container, so its forwarded client addresses are trusted
+# (rate limits then apply per visitor, not per proxy).
+CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips", "*"]

@@ -7,6 +7,7 @@ pub mod apu;
 pub mod chip;
 pub mod dsp;
 pub mod ffi;
+pub mod gb;
 pub mod sfx;
 pub mod tracker;
 pub mod vgm;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import { engine } from './audio/engine.svelte'
-  import { CHANNELS } from './audio/channels'
+  import { channelsFor } from './audio/channels'
   import { isTypingTarget, sfxShortcut } from './lib/keys'
   import { route } from './lib/route.svelte'
   import { lab } from './sfx/lab.svelte'
@@ -14,10 +14,15 @@
   import ChannelStrip from './components/ChannelStrip.svelte'
   import SfxLab from './components/sfx/SfxLab.svelte'
   import Toast from './components/Toast.svelte'
+  import AccountView from './components/account/AccountView.svelte'
+  import SharedView from './components/account/SharedView.svelte'
+  import { account } from './account/account.svelte'
   import { toast } from './lib/toast.svelte'
 
   $effect(() => {
     void lab.init(route.takeShareCode())
+    // Sync needs the composer's storage hooks in place first.
+    void composer.init().then(() => account.init())
   })
 
   // Each song screen hands the engine its own song; leaving stops the music. Only the
@@ -75,6 +80,7 @@
       }
       return
     }
+    if (route.mode !== 'sfx') return
     const shortcut = sfxShortcut(e.code, e.shiftKey)
     if (!shortcut || lab.status !== 'ready') return
     e.preventDefault()
@@ -107,12 +113,16 @@
   {#if route.mode === 'compose'}
     <ComposeView />
     <section class="strips" aria-label="Chip channels">
-      {#each CHANNELS as info, channel (info.name)}
+      {#each channelsFor(composer.song.chip) as info, channel (info.name)}
         <ChannelStrip {channel} {info} />
       {/each}
     </section>
   {:else if route.mode === 'convert'}
     <ConvertView />
+  {:else if route.mode === 'account'}
+    <AccountView />
+  {:else if route.mode === 'shared' && route.slug}
+    <SharedView slug={route.slug} />
   {:else}
     <SfxLab />
   {/if}

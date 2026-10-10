@@ -1,0 +1,32 @@
+{
+  "currency": "IRR",
+  "plans": [
+    {
+      "id": "free",
+      "name": "Free",
+      "maxSongs": 10,
+      "share": false,
+      "gpuConversion": false,
+      "badge": false,
+      "prices": {}
+    },
+    {
+      "id": "supporter",
+      "name": "Supporter",
+      "maxSongs": null,
+      "share": true,
+      "gpuConversion": false,
+      "badge": true,
+      "prices": { "month": 1000000, "year": 10000000 }
+    },
+    {
+      "id": "pro",
+      "name": "Pro",
+      "maxSongs": null,
+      "share": true,
+      "gpuConversion": true,
+      "badge": true,
+      "prices": { "month": 3000000, "year": 30000000 }
+    }
+  ]
+}

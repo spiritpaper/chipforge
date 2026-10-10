@@ -33,6 +33,9 @@ describe('instrument edits', () => {
     expect(setMacroValues(macro([0, 0, 0]), 1, [99, -5], 'volume').values).toEqual([0, 15, 0])
     expect(setMacroValues(macro([0]), 0, [-40], 'pitch').values).toEqual([-16])
     expect(setMacroValues(macro([0]), 3, [1], 'duty').values).toEqual([0])
+    // On the Game Boy, Tone also picks one of eight wave-channel waveforms.
+    expect(setMacroValues(macro([0]), 0, [9], 'duty').values).toEqual([3])
+    expect(setMacroValues(macro([0]), 0, [9], 'duty', 'gb').values).toEqual([7])
   })
 
   it('resizes macros and drops markers that fall off', () => {

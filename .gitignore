@@ -6,3 +6,6 @@ __pycache__/
 *.wav
 # Built from core/ by `pnpm --filter web wasm`
 web/src/audio/chipcore.wasm
+*.db
+*.db-journal
+deploy/.env

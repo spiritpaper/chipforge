@@ -3,6 +3,9 @@
 
 import { encodeWav } from '../sfx/wav'
 import { withComments } from './ogg'
+import oggWasmUrl from 'wasm-media-encoders/wasm/ogg?url'
+// A static import, so bundling keeps only createEncoder (not the inlined MP3 encoder).
+import { createEncoder } from 'wasm-media-encoders'
 import type { RenderedSong } from '../audio/chip-wasm'
 
 export type AudioFormat = 'wav' | 'ogg'
@@ -35,10 +38,18 @@ export function wavFile(a: ShapedAudio, sampleRate: number): Uint8Array<ArrayBuf
   return encodeWav(a.samples, sampleRate, a.loop ? { start: a.loop.start, end: a.loop.start + a.loop.length - 1 } : undefined)
 }
 
-/** Vorbis-encodes; loop points go in LOOPSTART/LOOPLENGTH comments (in samples). */
-export async function oggFile(a: ShapedAudio, sampleRate: number, title: string): Promise<Uint8Array<ArrayBuffer>> {
-  const { createOggEncoder } = await import('wasm-media-encoders')
-  const encoder = await createOggEncoder()
+/**
+ * Vorbis-encodes; loop points go in LOOPSTART/LOOPLENGTH comments (in samples).
+ * `wasm` is the Ogg encoder binary (its URL by default; tests pass the bytes). Only
+ * this encoder is loaded: the package's helpers would also bundle its MP3 encoder.
+ */
+export async function oggFile(
+  a: ShapedAudio,
+  sampleRate: number,
+  title: string,
+  wasm: string | ArrayBuffer | Uint8Array = oggWasmUrl,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const encoder = await createEncoder('audio/ogg', wasm)
   encoder.configure({ channels: 1, sampleRate, vbrQuality: 6 })
   const chunks: Uint8Array[] = []
   const block = 1 << 16

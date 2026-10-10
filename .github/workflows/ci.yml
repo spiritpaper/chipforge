@@ -40,6 +40,9 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      # Registry mirrors write their own tarball URLs into the lockfile; the integrity
+      # hashes are what matter, so URLs must not be committed (`pnpm lockfile:clean`).
+      - run: "! grep -n 'tarball: http' pnpm-lock.yaml"
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter web wasm
       - run: pnpm --filter web check
@@ -56,6 +59,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
       - run: uv run ruff check .
+      - run: uv run ruff format --check .
       - run: uv run pytest
 
   e2e:
@@ -72,6 +76,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter web build
+      # The account scenario runs the real API next to the app.
+      - uses: astral-sh/setup-uv@v6
       # GitHub's Ubuntu runners include Google Chrome.
       - run: pnpm --filter web e2e
       - if: failure()
@@ -114,3 +120,17 @@ jobs:
           dotnet-version: '10.0.x'
       # The C# wrapper against the native library; the Unity-only parts need Unity.
       - run: engines/unity/test.sh
+
+  self-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the stack
+        working-directory: deploy
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+      - run: deploy/smoke.sh http://localhost:8080
+      - if: failure()
+        working-directory: deploy
+        run: docker compose logs

@@ -1,9 +1,11 @@
-//! The whole chip: four channels, the APU's nonlinear mixer, output filters, the
-//! tracker [`Player`] that drives them, and per-channel scope capture for the UI.
+//! The whole chip: four channels, the mixer and output filters of the hardware the
+//! song is written for (NES or Game Boy), the tracker [`Player`] that drives them, and
+//! per-channel scope capture for the UI.
 
 use crate::apu::{Noise, Pulse, Triangle};
 use crate::dsp::OnePole;
-use crate::tracker::{Player, Position, Song};
+use crate::gb;
+use crate::tracker::{ChipKind, Player, Position, Song};
 
 pub const CHANNELS: usize = 4;
 pub const MAX_BLOCK: usize = 4096;
@@ -12,15 +14,27 @@ pub const SCOPE_LEN: usize = 1024;
 pub const MAX_RENDER_SECONDS: f32 = 600.0;
 
 const OUTPUT_GAIN: f32 = 1.6;
+/// The Game Boy mixes its four 4-bit DACs linearly; this matches the NES's loudness.
+const GB_GAIN: f32 = 0.23 / 15.0;
 
+/// The Game Boy's four channels.
+#[derive(Default)]
+struct GameBoy {
+    pulse1: gb::Pulse,
+    pulse2: gb::Pulse,
+    wave: gb::Wave,
+    noise: gb::Noise,
+}
 pub struct Chip {
     sample_rate: f32,
     pulse1: Pulse,
     pulse2: Pulse,
     triangle: Triangle,
     noise: Noise,
+    gb: GameBoy,
     muted: [bool; CHANNELS],
     high_pass: OnePole,
+    gb_high_pass: OnePole,
     low_pass: OnePole,
     player: Player,
     volume: f32,
@@ -47,8 +61,11 @@ impl Chip {
             pulse2: Pulse::default(),
             triangle: Triangle::default(),
             noise: Noise::default(),
+            gb: GameBoy::default(),
             muted: [false; CHANNELS],
             high_pass: OnePole::new(37.0, sample_rate),
+            // The DMG's output capacitor.
+            gb_high_pass: OnePole::new(20.0, sample_rate),
             low_pass: OnePole::new(14_000.0, sample_rate),
             player: Player::default(),
             volume: 1.0,
@@ -103,25 +120,49 @@ impl Chip {
         self.muted.get(channel).copied().unwrap_or(false)
     }
 
+    /// The chip the loaded song is written for.
+    pub fn kind(&self) -> ChipKind {
+        self.player.song().chip
+    }
+
     fn apply_voices(&mut self) {
         let [p1, p2, t, n] = *self.player.voices();
         let sr = self.sample_rate;
-        self.pulse1.set(p1, sr);
-        self.pulse2.set(p2, sr);
-        self.triangle.set(t, sr);
-        self.noise.set(n, sr);
+        match self.kind() {
+            ChipKind::Nes => {
+                self.pulse1.set(p1, sr);
+                self.pulse2.set(p2, sr);
+                self.triangle.set(t, sr);
+                self.noise.set(n, sr);
+            }
+            ChipKind::GameBoy => {
+                self.gb.pulse1.set(p1, sr);
+                self.gb.pulse2.set(p2, sr);
+                self.gb.wave.set(t, sr);
+                self.gb.noise.set(n, sr);
+            }
+        }
     }
 
     fn next_sample(&mut self) -> f32 {
         if self.player.clock(self.sample_rate) {
             self.apply_voices();
         }
-        let raw = [
-            self.pulse1.sample(),
-            self.pulse2.sample(),
-            self.triangle.sample(),
-            self.noise.sample(),
-        ];
+        let kind = self.kind();
+        let raw = match kind {
+            ChipKind::Nes => [
+                self.pulse1.sample(),
+                self.pulse2.sample(),
+                self.triangle.sample(),
+                self.noise.sample(),
+            ],
+            ChipKind::GameBoy => [
+                self.gb.pulse1.sample(),
+                self.gb.pulse2.sample(),
+                self.gb.wave.sample(),
+                self.gb.noise.sample(),
+            ],
+        };
 
         let pos = self.scope_pos;
         for (ch, &v) in raw.iter().enumerate() {
@@ -130,6 +171,11 @@ impl Chip {
         self.scope_pos = (pos + 1) % SCOPE_LEN;
 
         let [p1, p2, t, n] = std::array::from_fn(|ch| if self.muted[ch] { 0.0 } else { raw[ch] });
+        if kind == ChipKind::GameBoy {
+            let mixed = (p1 + p2 + t + n) * GB_GAIN;
+            let filtered = self.low_pass.low_pass(self.gb_high_pass.high_pass(mixed));
+            return (filtered * OUTPUT_GAIN * self.volume).clamp(-1.0, 1.0);
+        }
         // The 2A03's nonlinear DAC mix (see nesdev wiki, "APU Mixer").
         let pulse_sum = p1 + p2;
         let pulse_out = if pulse_sum > 0.0 {
@@ -292,6 +338,38 @@ mod tests {
         let mut chip = Chip::new(SR);
         chip.player_mut().preview(0, 69, 0);
         assert!(rms(&render_seconds(&mut chip, 0.2)) > 0.05);
+    }
+
+    #[test]
+    fn game_boy_songs_play_about_as_loud_as_nes_songs() {
+        let level = |chip: ChipKind| {
+            let mut song = busy_song();
+            song.chip = chip;
+            let mut c = Chip::new(SR);
+            c.load_song(song);
+            c.play_from(0, 0);
+            let out = render_seconds(&mut c, 2.0);
+            assert!(out.iter().all(|v| v.is_finite() && v.abs() <= 1.0));
+            rms(&out)
+        };
+        let (nes, gb) = (level(ChipKind::Nes), level(ChipKind::GameBoy));
+        assert!(
+            gb > 0.05 && (gb / nes - 1.0).abs() < 0.35,
+            "nes {nes}, gb {gb}"
+        );
+    }
+
+    #[test]
+    fn the_same_song_sounds_different_on_each_chip() {
+        let render = |chip: ChipKind| {
+            let mut song = busy_song();
+            song.chip = chip;
+            let mut c = Chip::new(SR);
+            c.load_song(song);
+            c.play_from(0, 0);
+            render_seconds(&mut c, 0.5)
+        };
+        assert_ne!(render(ChipKind::Nes), render(ChipKind::GameBoy));
     }
 
     #[test]

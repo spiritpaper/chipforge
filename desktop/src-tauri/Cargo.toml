@@ -1,0 +1,24 @@
+[package]
+name = "chipforge-desktop"
+version = "0.1.0"
+description = "ChipForge as a desktop app"
+edition = "2024"
+license = "AGPL-3.0-only"
+publish = false
+
+# Not part of the root workspace: it needs WebKitGTK and friends to build on Linux,
+# which the core, web and engine builds don't.
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+percent-encoding = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

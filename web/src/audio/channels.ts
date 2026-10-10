@@ -1,3 +1,5 @@
+import type { ChipKind } from '../song/model'
+
 export interface ChannelInfo {
   name: string
   role: string
@@ -13,3 +15,8 @@ export const CHANNELS: ChannelInfo[] = [
   { name: 'Triangle', role: 'Bass', color: 'var(--tri)', key: '3' },
   { name: 'Noise', role: 'Drums', color: 'var(--noise)', key: '4' },
 ]
+
+/** Game Boy (DMG) channels: the same roles, with the wave channel in the triangle's place. */
+export const GB_CHANNELS: ChannelInfo[] = CHANNELS.map((c, i) => (i === 2 ? { ...c, name: 'Wave' } : c))
+
+export const channelsFor = (chip: ChipKind | undefined) => (chip === 'gb' ? GB_CHANNELS : CHANNELS)

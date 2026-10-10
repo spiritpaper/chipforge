@@ -13,6 +13,8 @@ import { oggFile, shapeAudio, wavFile } from './audio'
 
 let wasm: ChipExports
 const SR = 22_050
+// The Ogg encoder binary, as the browser would fetch it.
+const oggWasm = readFileSync(new URL('../../node_modules/wasm-media-encoders/wasm/ogg.wasm', import.meta.url))
 
 beforeAll(async () => {
   wasm = await instantiateChip(await WebAssembly.compile(readFileSync(new URL('../audio/chipcore.wasm', import.meta.url))))
@@ -58,7 +60,7 @@ describe('audio export', () => {
 
   it('writes Ogg Vorbis with loop tags and valid page checksums', async () => {
     const r = rendered()
-    const bytes = await oggFile(shapeAudio(r, SR, 'loop'), SR, 'Test')
+    const bytes = await oggFile(shapeAudio(r, SR, 'loop'), SR, 'Test', oggWasm)
     expect(readComments(bytes)).toEqual(['TITLE=Test', 'ENCODER=ChipForge', `LOOPSTART=${r.loopStart}`, `LOOPLENGTH=${r.samples.length - r.loopStart}`])
     let pos = 0
     for (const _ of readPages(bytes)) {
@@ -77,7 +79,7 @@ describe('audio export', () => {
     const dir = mkdtempSync(join(tmpdir(), 'chipforge-'))
     const ogg = join(dir, 'song.ogg')
     const wav = join(dir, 'song.wav')
-    writeFileSync(ogg, await oggFile(shapeAudio(r, SR, 'loop'), SR, 'Test'))
+    writeFileSync(ogg, await oggFile(shapeAudio(r, SR, 'loop'), SR, 'Test', oggWasm))
     writeFileSync(wav, wavFile(shapeAudio(r, SR, 'loop'), SR))
     const probe = (f: string) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', f]).toString())
     const o = probe(ogg)

@@ -2,6 +2,7 @@
   import { composer } from '../../composer/composer.svelte'
   import { blankInstrument, instrumentUses, type MacroKind } from '../../song/instrument-edit'
   import { PRESET_INSTRUMENTS } from '../../song/instruments'
+  import { GB_WAVES } from '../../song/model'
   import MacroEditor from './MacroEditor.svelte'
 
   const MACROS: { kind: MacroKind; label: string; help: string }[] = [
@@ -35,6 +36,12 @@
   const index = $derived(composer.instrument)
   const inst = $derived(composer.song.instruments[index])
   const current = $derived(MACROS.find((m) => m.kind === tab)!)
+  const chip = $derived(composer.song.chip ?? 'nes')
+  const help = $derived(
+    tab === 'duty' && chip === 'gb'
+      ? `Pulse width per tick: 0 is thin (12.5%), 1 is 25%, 2 is hollow (50%), 3 is 75%. On the wave channel it picks the waveform: ${GB_WAVES.map((w, i) => `${i} ${w.toLowerCase()}`).join(', ')}. On noise, 1 makes it metallic.`
+      : current.help,
+  )
   const uses = $derived(confirmDelete ? instrumentUses(composer.song, index) : 0)
   const full = $derived(composer.song.instruments.length >= 64)
 
@@ -119,11 +126,12 @@
       <div id="macro-panel" role="tabpanel" aria-labelledby="tab-{tab}">
         <MacroEditor
           kind={tab}
+          {chip}
           macro={inst[tab]}
           onchange={(m, key) => composer.editMacro(index, tab, m, key)}
           ondone={() => composer.tryInstrument()}
         />
-        <p class="help">{current.help}</p>
+        <p class="help">{help}</p>
       </div>
     </section>
   {/if}

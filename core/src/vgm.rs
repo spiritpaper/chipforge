@@ -1,16 +1,22 @@
-//! VGM export: a song as a log of NES APU register writes (VGM 1.61), playable in VGM
-//! players and emulators (VGMPlay, foobar2000, game-music-emu) on a real 2A03 model.
+//! VGM export: a song as a log of sound-chip register writes (VGM 1.61) for the NES
+//! 2A03 or the Game Boy DMG, playable in VGM players and emulators (VGMPlay,
+//! foobar2000) on real chip models.
 //!
 //! The tracker player runs exactly as it does for audio; each tick its channel state is
 //! translated into register writes, writing only what changed. Pitches use the same
 //! hardware timer values the chip core plays.
 
 use crate::apu::{Voice, noise_period, pulse_timer, semitones_to_hz, triangle_timer};
-use crate::tracker::{CHANNELS, Player, Song};
+use crate::gb;
+use crate::tracker::{CHANNELS, ChipKind, Player, Song};
 
 /// VGM's fixed sample clock.
 pub const VGM_RATE: u32 = 44_100;
 const NES_CLOCK: u32 = 1_789_772;
+const GB_CLOCK: u32 = 4_194_304;
+/// VGM commands: write a register on the NES APU ($4000+) or Game Boy ($FF10+).
+const CMD_NES: u8 = 0xB4;
+const CMD_GB: u8 = 0xB3;
 const HEADER_LEN: usize = 0x100;
 /// Songs that never loop are cut here.
 const MAX_SAMPLES: u64 = VGM_RATE as u64 * 600;
@@ -29,20 +35,71 @@ const FRAME_COUNTER: u8 = 0x17;
 /// length never runs out, but it must be loaded once for the channel to sound.
 const LENGTH_LOAD: u8 = 0x08;
 
+/// Game Boy register offsets from $FF10.
+mod dmg {
+    /// NRx1 (duty), NRx2 (envelope), NRx3 (frequency low), NRx4 (trigger, high).
+    pub const PULSE: [u8; 2] = [0x01, 0x06];
+    pub const SWEEP: u8 = 0x00;
+    pub const WAVE_DAC: u8 = 0x0A;
+    pub const WAVE_LEVEL: u8 = 0x0C;
+    pub const WAVE_LO: u8 = 0x0D;
+    pub const WAVE_HI: u8 = 0x0E;
+    pub const NOISE_ENV: u8 = 0x11;
+    pub const NOISE_POLY: u8 = 0x12;
+    pub const NOISE_TRIGGER: u8 = 0x13;
+    pub const MASTER_VOLUME: u8 = 0x14;
+    pub const PANNING: u8 = 0x15;
+    pub const POWER: u8 = 0x16;
+    /// Wave RAM ($FF30–$FF3F).
+    pub const WAVE_RAM: u8 = 0x20;
+    pub const TRIGGER: u8 = 0x80;
+}
+
 struct Writer {
+    cmd: u8,
     data: Vec<u8>,
-    regs: [Option<u8>; 0x18],
+    regs: [Option<u8>; 0x30],
+    /// The waveform in Game Boy wave RAM.
+    wave: Option<u8>,
     pending_wait: u64,
 }
 
 impl Writer {
+    fn new(chip: ChipKind) -> Self {
+        Writer {
+            cmd: match chip {
+                ChipKind::Nes => CMD_NES,
+                ChipKind::GameBoy => CMD_GB,
+            },
+            data: Vec::new(),
+            regs: [None; 0x30],
+            wave: None,
+            pending_wait: 0,
+        }
+    }
+
     fn write(&mut self, reg: u8, value: u8) {
         if self.regs[reg as usize] == Some(value) {
             return;
         }
+        self.force(reg, value);
+    }
+
+    fn force(&mut self, reg: u8, value: u8) {
         self.flush_wait();
-        self.data.extend_from_slice(&[0xB4, reg, value]);
+        self.data.extend_from_slice(&[self.cmd, reg, value]);
         self.regs[reg as usize] = Some(value);
+    }
+
+    /// Writes a Game Boy NRx4: with `trigger`, restarts the channel so a new envelope
+    /// (volume) takes effect; otherwise only changes the frequency's high bits.
+    fn gb_high(&mut self, reg: u8, high: u8, trigger: bool) {
+        if trigger {
+            self.force(reg, dmg::TRIGGER | high);
+            self.regs[reg as usize] = Some(high);
+        } else {
+            self.write(reg, high);
+        }
     }
 
     fn flush_wait(&mut self) {
@@ -63,10 +120,19 @@ impl Writer {
 
     /// Forgets what's been written, so the next tick writes every register in full.
     fn invalidate(&mut self) {
-        self.regs = [None; 0x18];
+        self.regs = [None; 0x30];
+        self.wave = None;
     }
 
-    fn init(&mut self) {
+    fn init(&mut self, chip: ChipKind) {
+        if chip == ChipKind::GameBoy {
+            self.write(dmg::POWER, 0x80);
+            self.write(dmg::MASTER_VOLUME, 0x77);
+            self.write(dmg::PANNING, 0xFF);
+            self.write(dmg::SWEEP, 0x00);
+            self.write(dmg::WAVE_DAC, 0x00);
+            return;
+        }
         self.write(STATUS, 0x0F);
         self.write(FRAME_COUNTER, 0x40);
         // Sweep units off with negate set, so they can't silence low notes.
@@ -124,11 +190,85 @@ impl Writer {
         }
     }
 
-    fn apply(&mut self, voices: &[Option<Voice>; CHANNELS]) {
-        self.pulse(0, voices[0]);
-        self.pulse(1, voices[1]);
-        self.triangle(voices[2]);
-        self.noise(voices[3]);
+    fn apply(&mut self, chip: ChipKind, voices: &[Option<Voice>; CHANNELS]) {
+        match chip {
+            ChipKind::Nes => {
+                self.pulse(0, voices[0]);
+                self.pulse(1, voices[1]);
+                self.triangle(voices[2]);
+                self.noise(voices[3]);
+            }
+            ChipKind::GameBoy => {
+                self.gb_pulse(0, voices[0]);
+                self.gb_pulse(1, voices[1]);
+                self.gb_wave(voices[2]);
+                self.gb_noise(voices[3]);
+            }
+        }
+    }
+
+    fn gb_pulse(&mut self, i: usize, v: Option<Voice>) {
+        let base = dmg::PULSE[i];
+        let freq = v
+            .filter(|v| v.volume > 0)
+            .and_then(|v| gb::pulse_freq(semitones_to_hz(v.semitones)));
+        match (v, freq) {
+            (Some(v), Some(x)) => {
+                let envelope = v.volume.min(15) << 4;
+                let retrigger = self.regs[(base + 1) as usize] != Some(envelope);
+                self.write(base, (v.duty & 3) << 6);
+                self.write(base + 1, envelope);
+                self.write(base + 2, (x & 0xFF) as u8);
+                self.gb_high(base + 3, (x >> 8) as u8 & 0x07, retrigger);
+            }
+            // An envelope of zero turns the channel's DAC off.
+            _ => self.write(base + 1, 0x00),
+        }
+    }
+
+    fn gb_wave(&mut self, v: Option<Voice>) {
+        let level = v.map_or(0, |v| gb::wave_level(v.volume));
+        let freq = v.and_then(|v| gb::wave_freq(semitones_to_hz(v.semitones)));
+        match (v, freq) {
+            (Some(v), Some(x)) if level > 0 => {
+                let wave = v.duty & 7;
+                let mut retrigger = self.regs[dmg::WAVE_DAC as usize] != Some(0x80);
+                if self.wave != Some(wave) {
+                    // Wave RAM is only safely writable with the channel's DAC off.
+                    self.write(dmg::WAVE_DAC, 0x00);
+                    for (i, pair) in gb::WAVES[wave as usize].chunks_exact(2).enumerate() {
+                        self.force(dmg::WAVE_RAM + i as u8, (pair[0] << 4) | pair[1]);
+                    }
+                    self.wave = Some(wave);
+                    retrigger = true;
+                }
+                self.write(dmg::WAVE_DAC, 0x80);
+                self.write(dmg::WAVE_LEVEL, level << 5);
+                self.write(dmg::WAVE_LO, (x & 0xFF) as u8);
+                self.gb_high(dmg::WAVE_HI, (x >> 8) as u8 & 0x07, retrigger);
+            }
+            // Output level zero mutes the wave but leaves it running, without a click.
+            _ => self.write(dmg::WAVE_LEVEL, 0x00),
+        }
+    }
+
+    fn gb_noise(&mut self, v: Option<Voice>) {
+        match v.filter(|v| v.volume > 0) {
+            Some(v) => {
+                let (divisor, shift) = gb::NOISE_SETTINGS[noise_period(v.semitones) as usize];
+                let envelope = v.volume.min(15) << 4;
+                let retrigger = self.regs[dmg::NOISE_ENV as usize] != Some(envelope);
+                self.write(
+                    dmg::NOISE_POLY,
+                    (shift << 4) | ((v.duty & 1) << 3) | divisor,
+                );
+                self.write(dmg::NOISE_ENV, envelope);
+                if retrigger {
+                    self.force(dmg::NOISE_TRIGGER, dmg::TRIGGER);
+                }
+            }
+            None => self.write(dmg::NOISE_ENV, 0x00),
+        }
     }
 }
 
@@ -142,14 +282,11 @@ fn gd3_string(s: &str, out: &mut Vec<u8>) {
 /// Renders `song` once through as a VGM file, looping where the song loops.
 pub fn render_vgm(song: Song, title: &str) -> Vec<u8> {
     let order_count = song.order.len();
+    let chip = song.chip;
     let mut player = Player::new(song);
     player.play_from(0, 0);
-    let mut w = Writer {
-        data: Vec::new(),
-        regs: [None; 0x18],
-        pending_wait: 0,
-    };
-    w.init();
+    let mut w = Writer::new(chip);
+    w.init(chip);
 
     // Byte offset and sample at which each order entry first started.
     let mut entered: Vec<Option<(usize, u64)>> = vec![None; order_count];
@@ -169,7 +306,7 @@ pub fn render_vgm(song: Song, title: &str) -> Vec<u8> {
                     entered[row.order] = Some((w.data.len(), samples));
                 }
             }
-            w.apply(player.voices());
+            w.apply(chip, player.voices());
         }
         w.pending_wait += 1;
         samples += 1;
@@ -183,7 +320,10 @@ pub fn render_vgm(song: Song, title: &str) -> Vec<u8> {
         "",
         "",
         "",
-        "Nintendo Entertainment System",
+        match chip {
+            ChipKind::Nes => "Nintendo Entertainment System",
+            ChipKind::GameBoy => "Nintendo Game Boy",
+        },
         "",
         "",
         "",
@@ -210,7 +350,10 @@ pub fn render_vgm(song: Song, title: &str) -> Vec<u8> {
         put(&mut out, 0x20, (samples - at) as u32);
     }
     put(&mut out, 0x34, (HEADER_LEN - 0x34) as u32);
-    put(&mut out, 0x84, NES_CLOCK);
+    match chip {
+        ChipKind::Nes => put(&mut out, 0x84, NES_CLOCK),
+        ChipKind::GameBoy => put(&mut out, 0x80, GB_CLOCK),
+    }
     out.extend_from_slice(&w.data);
     out.extend_from_slice(b"Gd3 ");
     out.extend_from_slice(&0x0100u32.to_le_bytes());
@@ -223,7 +366,7 @@ pub fn render_vgm(song: Song, title: &str) -> Vec<u8> {
 mod tests {
     use super::*;
     use crate::tracker::tests::song_with;
-    use crate::tracker::{Cell, Instrument};
+    use crate::tracker::{Cell, Instrument, Macro};
 
     fn u32_at(v: &[u8], at: usize) -> u32 {
         u32::from_le_bytes(v[at..at + 4].try_into().unwrap())
@@ -235,7 +378,7 @@ mod tests {
         let mut i = HEADER_LEN;
         loop {
             match v[i] {
-                0xB4 => {
+                CMD_NES | CMD_GB => {
                     out.push((v[i + 1], v[i + 2]));
                     i += 3;
                 }
@@ -320,6 +463,25 @@ mod tests {
         )
     }
 
+    /// Pitch of 2 s of `pcm` from half a second in, by mean crossings.
+    fn libvgm_hz(pcm: &[f32]) -> f32 {
+        let rate = 44_100.0;
+        let tail = &pcm[(0.5 * rate) as usize..(2.5 * rate) as usize];
+        let mean = tail.iter().sum::<f32>() / tail.len() as f32;
+        let rises = tail
+            .windows(2)
+            .filter(|w| w[0] < mean && w[1] >= mean)
+            .count();
+        rises as f32 / 2.0
+    }
+
+    fn gb_song(cells: &[(usize, usize, Cell)], instrument: Instrument) -> Song {
+        Song {
+            chip: ChipKind::GameBoy,
+            ..song_with(cells, instrument)
+        }
+    }
+
     #[test]
     fn plays_in_an_independent_emulator_at_the_right_pitch() {
         // A held A4 on pulse 1 for the whole pattern.
@@ -331,15 +493,70 @@ mod tests {
             eprintln!("vgm2wav (libvgm) not available; skipping");
             return;
         };
-        let rate = 44_100.0;
-        let tail = &pcm[(0.5 * rate) as usize..(2.5 * rate) as usize];
-        let mean = tail.iter().sum::<f32>() / tail.len() as f32;
-        let rises = tail
-            .windows(2)
-            .filter(|w| w[0] < mean && w[1] >= mean)
-            .count();
-        let hz = rises as f32 / 2.0;
+        let hz = libvgm_hz(&pcm);
         assert!((hz - 440.0).abs() < 3.0, "libvgm plays {hz} Hz");
+    }
+
+    #[test]
+    fn header_describes_a_game_boy_vgm() {
+        let v = render_vgm(
+            gb_song(&[(0, 0, Cell::note(69, 0))], Instrument::default()),
+            "",
+        );
+        assert_eq!(u32_at(&v, 0x80), GB_CLOCK);
+        assert_eq!(u32_at(&v, 0x84), 0, "no NES chip");
+        let w = writes(&v);
+        assert_eq!(w[0], (dmg::POWER, 0x80), "sound powered on first");
+        let x = gb::pulse_freq(440.0).unwrap();
+        assert!(w.contains(&(0x01, 2 << 6)), "50% duty");
+        assert!(w.contains(&(0x02, 0xF0)), "full volume");
+        assert!(w.contains(&(0x03, (x & 0xFF) as u8)));
+        assert!(w.contains(&(0x04, 0x80 | (x >> 8) as u8)), "triggered");
+    }
+
+    #[test]
+    fn game_boy_volume_changes_retrigger_and_waves_load_wave_ram() {
+        let v = render_vgm(
+            gb_song(
+                &[(0, 0, Cell::note(69, 0)), (0, 2, Cell::note(57, 0))],
+                Instrument {
+                    volume: Macro::new(&[15, 10, 5]),
+                    ..Default::default()
+                },
+            ),
+            "",
+        );
+        let w = writes(&v);
+        let triggers = w
+            .iter()
+            .filter(|&&(r, v)| r == 0x04 && v & 0x80 != 0)
+            .count();
+        assert_eq!(triggers, 3, "one per volume step");
+        let triangle: Vec<u8> = gb::WAVES[2].chunks(2).map(|p| (p[0] << 4) | p[1]).collect();
+        let ram: Vec<u8> = (0..16)
+            .map(|i| w.iter().find(|(r, _)| *r == dmg::WAVE_RAM + i).unwrap().1)
+            .collect();
+        assert_eq!(ram, triangle);
+        assert!(w.contains(&(dmg::WAVE_LEVEL, 1 << 5)), "wave at full level");
+    }
+
+    #[test]
+    fn game_boy_vgm_plays_in_an_independent_emulator() {
+        for (channel, note, hz) in [(0, 69, 440.0), (2, 57, 220.0)] {
+            let v = render_vgm(
+                gb_song(&[(0, channel, Cell::note(note, 0))], Instrument::default()),
+                "",
+            );
+            let Some(pcm) = decode_with_libvgm(&v) else {
+                eprintln!("vgm2wav (libvgm) not available; skipping");
+                return;
+            };
+            let got = libvgm_hz(&pcm);
+            assert!(
+                (got - hz).abs() < 3.0,
+                "channel {channel}: libvgm plays {got} Hz"
+            );
+        }
     }
 
     #[test]

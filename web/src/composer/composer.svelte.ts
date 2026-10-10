@@ -19,7 +19,7 @@ import {
   type Clip,
   type Region,
 } from '../song/edit'
-import { CHANNEL_COUNT, LIMITS, NOTE_OFF, NOTE_RELEASE, emptySong, type Cell, type Song } from '../song/model'
+import { CHANNEL_COUNT, LIMITS, NOTE_OFF, NOTE_RELEASE, emptySong, type Cell, type ChipKind, type Song } from '../song/model'
 import { firstLight } from '../song/templates'
 import { COLUMNS, COLUMN_COUNT, type Column, type TrackerAction } from './keys'
 import { addInstrument, deleteInstrument, updateInstrument, type MacroKind } from '../song/instrument-edit'
@@ -84,7 +84,7 @@ class Composer {
       const id = this.projects.find((p) => p.id === lastId)?.id ?? this.projects[0]?.id
       const song = id ? await loadProject(id) : null
       if (id && song) this.open(id, song)
-      else await this.create(firstLight())
+      else await this.createStarter()
       this.status = 'ready'
     } catch {
       // IndexedDB can be blocked; keep working in memory.
@@ -107,6 +107,18 @@ class Composer {
     engine.setSong(song)
   }
 
+  /**
+   * The demo song a fresh browser opens with. It's saved without counting as the
+   * user's work, so sync leaves it alone until it's edited.
+   */
+  private async createStarter() {
+    const id = crypto.randomUUID()
+    const song = firstLight()
+    this.open(id, song)
+    writePref('compose.starter', id)
+    this.projects = await saveProject(id, song, { fromSync: true }).catch(() => this.projects)
+  }
+
   async create(song: Song = emptySong()) {
     const id = crypto.randomUUID()
     this.open(id, song)
@@ -118,6 +130,26 @@ class Composer {
     await this.flushSave()
     const song = await loadProject(id)
     if (song) this.open(id, song)
+  }
+
+  /** Sync changed a stored song: refresh the list, and reload it if it's open. */
+  async reloadFromStorage(id: string) {
+    this.projects = await listProjects()
+    if (id !== this.projectId) return
+    // Drop any pending autosave: the stored copy is now the right one, and saving the
+    // open song would undo the change (or resurrect a song deleted elsewhere).
+    clearTimeout(this.saveTimer)
+    const song = await loadProject(id)
+    if (song) return this.open(id, song)
+    for (const p of this.projects) {
+      const next = await loadProject(p.id)
+      if (next) return this.open(p.id, next)
+    }
+    await this.create()
+  }
+
+  async refreshProjects() {
+    this.projects = await listProjects()
   }
 
   async duplicate(id: string) {
@@ -212,6 +244,13 @@ class Composer {
   setBpm(bpm: number) {
     if (!Number.isFinite(bpm)) return
     this.commit({ ...this.song, bpm: Math.round(Math.min(LIMITS.bpm[1], Math.max(LIMITS.bpm[0], bpm))) }, 'bpm')
+  }
+
+  /** Moves the song to another chip; notes and instruments carry over. */
+  setChip(chip: ChipKind) {
+    if ((this.song.chip ?? 'nes') === chip) return
+    const { chip: _, ...rest } = this.song
+    this.commit(chip === 'gb' ? { ...rest, chip } : rest)
   }
 
   setSpeed(speed: number) {

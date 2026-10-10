@@ -1,6 +1,7 @@
 <script lang="ts">
   import PixelIcon, { type GlyphName } from './PixelIcon.svelte'
   import type { Mode } from '../lib/hash'
+  import { isDesktop } from '../lib/desktop'
 
   let { current }: { current: Mode } = $props()
 
@@ -16,7 +17,9 @@
     { label: 'SFX Lab', icon: 'spark', mode: 'sfx' },
     { label: 'Compose', icon: 'note', mode: 'compose' },
     { label: 'Convert', icon: 'convert', mode: 'convert' },
-    { label: 'Library', icon: 'stack', mode: null, comingIn: 'Phase 5' },
+    { label: 'Library', icon: 'stack', mode: null, comingIn: 'a later update' },
+    // The desktop app works offline, with no server to sign in to.
+    ...(isDesktop ? [] : [{ label: 'Account', icon: 'person', mode: 'account' } satisfies RailItem]),
   ]
 </script>
 

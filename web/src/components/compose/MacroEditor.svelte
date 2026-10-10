@@ -1,14 +1,17 @@
 <script lang="ts">
-  import { MACRO_RANGE, MAX_MACRO_STEPS, resizeMacro, setMacroValues, toggleMarker, type MacroKind } from '../../song/instrument-edit'
-  import type { Macro } from '../../song/model'
+  import { MAX_MACRO_STEPS, macroRange, resizeMacro, setMacroValues, toggleMarker, type MacroKind } from '../../song/instrument-edit'
+  import type { ChipKind, Macro } from '../../song/model'
 
   let {
     kind,
+    chip,
     macro,
     onchange,
     ondone,
   }: {
     kind: MacroKind
+    /** The song's chip, which sets the Tone range. */
+    chip: ChipKind
     macro: Macro
     /** A new macro; edits sharing a key undo together. */
     onchange: (m: Macro, coalesceKey?: string) => void
@@ -24,7 +27,7 @@
   let drawing: { key: string; last: number; lastValue: number } | null = null
   let gestures = 0
 
-  const [lo, hi] = $derived(MACRO_RANGE[kind])
+  const [lo, hi] = $derived(macroRange(kind, chip))
   const steps = $derived(macro.values.length)
   const stepW = $derived(Math.max(8, Math.floor(width / Math.max(steps, 16))))
   const yOf = (v: number) => ((hi - v) / (hi - lo)) * (HEIGHT - 4) + 2
@@ -47,13 +50,13 @@
     const span = Math.abs(step - d.last)
     let next: Macro
     if (first || span === 0) {
-      next = setMacroValues(macro, step, [value], kind)
+      next = setMacroValues(macro, step, [value], kind, chip)
     } else {
       const dir = Math.sign(step - d.last)
       next = macro
       for (let k = 1; k <= span; k++) {
         const v = d.lastValue + ((value - d.lastValue) * k) / span
-        next = setMacroValues(next, d.last + dir * k, [v], kind)
+        next = setMacroValues(next, d.last + dir * k, [v], kind, chip)
       }
     }
     onchange(next, d.key)
@@ -91,10 +94,10 @@
         selected = Math.min(steps - 1, selected + 1)
         break
       case 'ArrowUp':
-        onchange(setMacroValues(macro, selected, [value + delta], kind), `macro-key:${selected}`)
+        onchange(setMacroValues(macro, selected, [value + delta], kind, chip), `macro-key:${selected}`)
         break
       case 'ArrowDown':
-        onchange(setMacroValues(macro, selected, [value - delta], kind), `macro-key:${selected}`)
+        onchange(setMacroValues(macro, selected, [value - delta], kind, chip), `macro-key:${selected}`)
         break
       default:
         return

@@ -2,6 +2,7 @@
   "name": "web",
   "private": true,
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
     "wasm": "cargo build --profile wasm --target wasm32-unknown-unknown -p chipcore --manifest-path ../Cargo.toml && cp ../target/wasm32-unknown-unknown/wasm/chipcore.wasm src/audio/chipcore.wasm",
@@ -32,6 +33,7 @@
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/silkscreen": "^5.3.0",
     "@spotify/basic-pitch": "^1.0.1",
+    "@tauri-apps/api": "^2.12.2",
     "@tensorflow/tfjs": "^3.21.0",
     "fflate": "^0.8.3",
     "idb-keyval": "^6.3.0",

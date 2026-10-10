@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte'
   import { engine } from '../../audio/engine.svelte'
-  import { CHANNELS } from '../../audio/channels'
+  import { channelsFor } from '../../audio/channels'
   import { composer } from '../../composer/composer.svelte'
   import { segments, type Segment } from '../../lib/grid'
   import { addNote, moveNote, removeNote, resizeNote } from '../../song/roll'
@@ -173,7 +173,7 @@
 <div class="roll">
   <div class="tools">
     <div class="channels" role="radiogroup" aria-label="Channel to edit">
-      {#each CHANNELS as info, ch (info.name)}
+      {#each channelsFor(composer.song.chip) as info, ch (info.name)}
         <button
           role="radio"
           aria-checked={ch === channel}
@@ -211,7 +211,7 @@
         class:erase={tool === 'erase'}
         width={length * cellW}
         height={pitches.length * rowH}
-        style:--c={CHANNELS[channel].color}
+        style:--c={channelsFor(composer.song.chip)[channel].color}
         {onpointerdown}
         {onpointermove}
         {onpointerup}
@@ -225,7 +225,7 @@
         {/each}
         {#each ghosts as g (`${g.ch}:${g.start}`)}
           {#if g.note <= high && g.note >= low}
-            <rect class="ghost" style:--g={CHANNELS[g.ch].color} x={g.start * cellW} y={y(g.note) + 2} width={g.length * cellW - 1} height={rowH - 4} />
+            <rect class="ghost" style:--g={channelsFor(composer.song.chip)[g.ch].color} x={g.start * cellW} y={y(g.note) + 2} width={g.length * cellW - 1} height={rowH - 4} />
           {/if}
         {/each}
         {#if playRow >= 0}

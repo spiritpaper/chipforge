@@ -12,7 +12,8 @@
 //!
 //! ```text
 //! header   "CFS" u8 version · u16 bpm · u8 speed · u8 rows_per_beat · u16 pattern_length
-//!          u16 pattern_count · u16 order_len · u16 loop_point · u8 instrument_count · u8 0
+//!          u16 pattern_count · u16 order_len · u16 loop_point · u8 instrument_count · u8 chip
+//!          (0 = NES 2A03, 1 = Game Boy; this byte was always 0 before chips were added)
 //! order    order_len × u16 pattern index
 //! instr.   instrument_count × 4 macros (volume, duty, pitch, arpeggio), each:
 //!          u8 len · u8 loop (255 = none) · u8 release (255 = none) · len × i8 values
@@ -115,7 +116,8 @@ impl Macro {
 pub struct Instrument {
     /// 0..=15 per tick; empty means full volume.
     pub volume: Macro,
-    /// Pulse duty index 0..=3 (noise: 1 = metallic); empty means 50% / normal noise.
+    /// Pulse duty index 0..=3 (noise: 1 = metallic; Game Boy wave: waveform 0..=7);
+    /// empty means 50% / normal noise / the triangle wave.
     pub duty: Macro,
     /// Relative pitch change per tick in 1/16 semitones, accumulated.
     pub pitch: Macro,
@@ -136,8 +138,35 @@ impl Instrument {
     }
 }
 
+/// The sound chip a song is written for. Both have two pulses, a third melodic channel
+/// and noise, so songs move between them; each sounds like its own hardware.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ChipKind {
+    #[default]
+    Nes,
+    GameBoy,
+}
+
+impl ChipKind {
+    pub fn from_byte(b: u8) -> Option<ChipKind> {
+        match b {
+            0 => Some(ChipKind::Nes),
+            1 => Some(ChipKind::GameBoy),
+            _ => None,
+        }
+    }
+
+    pub fn byte(self) -> u8 {
+        match self {
+            ChipKind::Nes => 0,
+            ChipKind::GameBoy => 1,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Song {
+    pub chip: ChipKind,
     pub bpm: u16,
     /// Ticks per row.
     pub speed: u8,
@@ -155,6 +184,7 @@ pub struct Song {
 impl Default for Song {
     fn default() -> Self {
         Song {
+            chip: ChipKind::Nes,
             bpm: 150,
             speed: 6,
             rows_per_beat: 4,
@@ -226,7 +256,7 @@ impl Song {
         let order_len = r.u16()? as usize;
         let loop_point = r.u16()?;
         let instrument_count = r.u8()? as usize;
-        r.u8()?;
+        let chip = ChipKind::from_byte(r.u8()?).ok_or(DecodeError::BadHeader("chip"))?;
 
         if !(30..=300).contains(&bpm) {
             return Err(DecodeError::BadHeader("bpm"));
@@ -298,6 +328,7 @@ impl Song {
             .collect();
 
         Ok(Song {
+            chip,
             bpm,
             speed,
             rows_per_beat,
@@ -321,7 +352,7 @@ impl Song {
         out.extend_from_slice(&(self.order.len() as u16).to_le_bytes());
         out.extend_from_slice(&self.loop_point.to_le_bytes());
         out.push(self.instruments.len() as u8);
-        out.push(0);
+        out.push(self.chip.byte());
         debug_assert_eq!(out.len(), HEADER_LEN);
         for p in &self.order {
             out.extend_from_slice(&p.to_le_bytes());
@@ -454,7 +485,7 @@ impl ChannelState {
             b'4' => self.vibrato = (p >> 4, p & 15),
             b'A' => self.volume_slide = ((p >> 4) as f32 - (p & 15) as f32) / 8.0,
             b'S' => self.cut_at_tick = Some(p),
-            b'V' => self.duty_override = Some(p & 3),
+            b'V' => self.duty_override = Some(p & 7),
             _ => {}
         }
         match cell.note {
@@ -490,7 +521,7 @@ impl ChannelState {
         let macro_volume = value(vol_m, self.pos[0]).map_or(15.0, |v| v.clamp(0, 15) as f32);
         let duty = self
             .duty_override
-            .or(value(duty_m, self.pos[1]).map(|d| (d & 3) as u8))
+            .or(value(duty_m, self.pos[1]).map(|d| (d & 7) as u8))
             .unwrap_or(2);
         self.pitch_macro_offset += value(pitch_m, self.pos[2]).unwrap_or(0) as f32 / 16.0;
         let arp_macro = value(arp_m, self.pos[3]).unwrap_or(0) as f32;
@@ -885,6 +916,19 @@ pub(crate) mod tests {
         let mut p = Player::new(song);
         p.play_from(0, 0);
         p
+    }
+
+    #[test]
+    fn chip_kind_round_trips_and_old_songs_are_nes() {
+        let mut song = Song::default();
+        assert_eq!(Song::decode(&song.encode()).unwrap().chip, ChipKind::Nes);
+        song.chip = ChipKind::GameBoy;
+        let bytes = song.encode();
+        assert_eq!(bytes[17], 1);
+        assert_eq!(Song::decode(&bytes).unwrap(), song);
+        let mut bad = bytes.clone();
+        bad[17] = 9;
+        assert_eq!(Song::decode(&bad), Err(DecodeError::BadHeader("chip")));
     }
 
     #[test]
