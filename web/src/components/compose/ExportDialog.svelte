@@ -76,6 +76,13 @@
     toast.show(`Saved ${base}.mid`)
   }
 
+  const engineBytes = $derived(open ? encodeSong(composer.song).length : 0)
+
+  function exportEngineFile() {
+    download(encodeSong(composer.song), `${base}.chipsong`, 'application/octet-stream')
+    toast.show(`Saved ${base}.chipsong`)
+  }
+
   function exportSongFile() {
     download(JSON.stringify(composer.song), `${base}.chipsong.json`, 'application/json')
     toast.show(`Saved ${base}.chipsong.json`)
@@ -115,6 +122,16 @@
     </label>
     <button class="key" onclick={exportAudio} disabled={busy}>{busy ? 'Rendering…' : `Download ${base}.${format}`}</button>
     {#if result}<p class="result" role="status">{result}</p>{/if}
+  </section>
+
+  <section>
+    <h3>Game engine file</h3>
+    <p>
+      For the ChipForge plugins for Godot, Unity and C/C++. The song plays live from this file, so
+      you can mute layers, change tempo or switch sections as the game changes. This song is
+      {(engineBytes / 1024).toFixed(1)} KB.
+    </p>
+    <button class="key" onclick={exportEngineFile}>Download {base}.chipsong</button>
   </section>
 
   <section>
