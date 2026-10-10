@@ -1,15 +1,18 @@
 <script lang="ts">
   import { account } from '../../account/account.svelte'
+  import { PAYMENT_RESULTS, formatPrice, planFeatures } from '../../account/billing'
 
   let email = $state('')
   const params = new URLSearchParams(location.hash.split('?')[1] ?? '')
   const linkError = params.get('error') === 'link'
+  const payment = PAYMENT_RESULTS[params.get('payment') ?? '']
+  const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' })
 
   const when = (t: number) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 
   $effect(() => {
     // Arriving from a sign-in link: the cookie is new, so check again.
-    if (params.get('signed-in')) void account.refresh()
+    if (params.get('signed-in') || params.get('payment')) void account.refresh()
   })
 </script>
 
@@ -63,11 +66,49 @@
         <ul>{#each account.conflicts as title, i (i)}<li>{title}</li>{/each}</ul>
       </div>
     {/if}
+    {#if account.limitMessage}<p class="notice" role="status">{account.limitMessage}</p>{/if}
     {#if account.error}<p class="error" role="alert">Sync problem: {account.error}</p>{/if}
     <div class="row">
       <button class="key" onclick={() => account.syncAll()} disabled={account.syncing}>Sync now</button>
       <button class="key" onclick={() => account.signOut()}>Sign out</button>
     </div>
+
+    {#if account.billing?.enabled && account.plan}
+      <section class="plans" aria-labelledby="plans-title">
+        <h2 id="plans-title">Plan</h2>
+        {#if payment}
+          <p class={payment.ok ? 'sent' : payment.ok === null ? 'muted' : 'error'} role="status">{payment.text}</p>
+        {/if}
+        <p>
+          You're on <strong>{account.plan.name}</strong>{#if account.plan.until}, paid until {day(account.plan.until)}{/if}.
+          {#if account.plan.maxSongs !== null && account.usage}
+            {account.usage.songs} of {account.plan.maxSongs} songs synced.
+          {/if}
+        </p>
+        <div class="cards">
+          {#each account.billing.plans.filter((p) => p.id !== 'free') as p (p.id)}
+            <div class="card" class:current={p.id === account.plan.id}>
+              <h3>{p.name}</h3>
+              <ul>{#each planFeatures(p) as f, i (i)}<li>{f}</li>{/each}</ul>
+              {#if account.billing.checkout}
+                <div class="row">
+                  {#each ['month', 'year'] as const as period (period)}
+                    {#if p.prices[period]}
+                      <button class="key" onclick={() => account.checkout(p.id, period)}>
+                        {p.id === account.plan.id ? 'Add' : 'Pay for'} a {period}: {formatPrice(p.prices[period]!, account.billing.currency)}
+                      </button>
+                    {/if}
+                  {/each}
+                </div>
+              {:else}
+                <p class="muted">Payments aren't set up on this server yet.</p>
+              {/if}
+            </div>
+          {/each}
+        </div>
+        <p class="muted">Plans are prepaid: a payment adds a month or a year, and nothing renews by itself.</p>
+      </section>
+    {/if}
   {/if}
 </section>
 
@@ -126,6 +167,52 @@
 
   .notice ul {
     margin: var(--u) 0 0;
+  }
+
+  .plans {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--u) * 3);
+    width: 100%;
+    margin-top: calc(var(--u) * 4);
+    padding-top: calc(var(--u) * 5);
+    border-top: 1px solid var(--line);
+  }
+
+  h2 {
+    font-size: var(--step-2);
+    font-weight: 600;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: calc(var(--u) * 3);
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--u) * 2);
+    padding: calc(var(--u) * 4);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-key);
+    background: var(--panel);
+  }
+
+  .card.current {
+    border-color: var(--pulse2);
+  }
+
+  h3 {
+    font-size: var(--step-1);
+    font-weight: 600;
+  }
+
+  .card ul {
+    margin: 0;
+    padding-left: calc(var(--u) * 5);
+    color: var(--muted);
   }
 
   .link {

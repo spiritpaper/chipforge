@@ -12,6 +12,7 @@ import { validateSong } from '../song/validate'
 import { ApiError, api, serverAvailable } from './api'
 import { readPref, writePref } from '../lib/prefs'
 import { mergeLibraries, planSync, type SongSyncState } from './plan'
+import type { BillingInfo, PlanInfo } from './billing'
 
 const STATE_KEY = 'chipforge.sync.v1'
 const PUSH_DELAY_MS = 1500
@@ -38,6 +39,11 @@ class Account {
   linkSentTo = $state<string | null>(null)
   /** Songs kept twice because they changed here and elsewhere at once. */
   conflicts = $state<string[]>([])
+  plan = $state<PlanInfo | null>(null)
+  usage = $state<{ songs: number } | null>(null)
+  billing = $state<BillingInfo | null>(null)
+  /** Set when the plan's limit kept songs from syncing (they stay on this device). */
+  limitMessage = $state<string | null>(null)
 
   private state: SyncState = { songs: {}, sfx: { version: 0, dirty: false } }
   private pushTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -73,8 +79,11 @@ class Account {
   /** Re-checks the session (e.g. after following a sign-in link) and syncs. */
   async refresh() {
     try {
-      const me = await api<{ email: string | null }>('/me')
+      const me = await api<{ email: string | null; plan?: PlanInfo; usage?: { songs: number }; billing: BillingInfo }>('/me')
       this.email = me.email
+      this.plan = me.plan ?? null
+      this.usage = me.usage ?? null
+      this.billing = me.billing
       this.status = me.email ? 'signed-in' : 'signed-out'
       if (me.email) await this.syncAll()
     } catch {
@@ -122,6 +131,7 @@ class Account {
     if (this.status !== 'signed-in' || this.syncing) return
     this.syncing = true
     this.error = null
+    this.limitMessage = null
     try {
       const server = await api<{ id: string; version: number }[]>('/songs')
       // The demo song a fresh browser starts with isn't the user's work until they
@@ -175,6 +185,8 @@ class Account {
       this.state.songs[id] = { version, dirty: false }
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) await this.keepBoth(id, song, err.body as Conflict<Song>)
+      // Over the plan's limit: the song stays on this device, still marked to sync.
+      else if (err instanceof ApiError && err.status === 402) this.limitMessage = err.message
       else this.error = err instanceof Error ? err.message : String(err)
     }
   }
@@ -232,6 +244,17 @@ class Account {
         const { version } = await api<{ version: number }>('/sfx-library', { method: 'PUT', json: retry })
         this.state.sfx = { version, dirty: false }
       } else this.error = err instanceof Error ? err.message : String(err)
+    }
+  }
+
+  /** Starts paying for a plan period: sends the browser to the payment gateway. */
+  async checkout(plan: string, period: 'month' | 'year') {
+    this.error = null
+    try {
+      const { url } = await api<{ url: string }>('/billing/checkout', { method: 'POST', json: { plan, period } })
+      location.href = url
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : String(err)
     }
   }
 
