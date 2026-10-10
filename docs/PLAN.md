@@ -171,16 +171,37 @@ Not done:
 
 ---
 
-## Phase 5 — Platform & polish (ongoing)
+## Phase 5 — Open source, sync and more chips — built
 
-1. Accounts (email magic link + OAuth), cloud sync of projects and SFX libraries.
-2. Public gallery of original songs/SFX packs; "Remix" forks a project.
-3. More chip profiles: Game Boy (wave channel), C64 SID (filter), SN76489, YM2612 FM.
-4. Tauri desktop app with offline conversion (bundled models).
-5. AI helpers: text → song sketch ("boss theme, C minor, 160 BPM"), text → SFX.
-6. Accessibility audit, localization, onboarding tour.
-7. Monetization: Pro tier (long/HD conversions, extra chips, engine plugins,
-   commercial license).
+Built:
+1. **Open source**: core, native library and engine plugins under MIT (easy to ship
+   in games); the app, server and everything else under AGPL-3.0, so hosted copies
+   share their changes. Contributing guide, code of conduct, security policy, issue
+   templates, third-party notices. The bundle leaves out the LGPL MP3 encoder.
+2. **Accounts and sync**: email magic-link sign-in (no passwords), sessions in
+   HttpOnly cookies, versioned sync of songs and the SFX library with conflicts kept
+   as copies, read-only share links. Self-hosting with Docker Compose (Caddy + API),
+   smoke-tested in CI.
+3. **Plans**: Free / Supporter / Pro from an editable JSON file, enforced by the
+   server (402 with a plain message; songs over the limit stay on the device).
+   Prepaid months or years through ZarinPal, plus an admin command to grant plans.
+   Off by default, so self-hosted servers have no limits. The gateway is tested
+   against a fake ZarinPal only; test in their sandbox before taking money.
+4. **Game Boy chip**: two pulses, the 4-bit wave channel with eight waveforms, and
+   noise with its 7-bit mode. Any song switches between NES and Game Boy; VGM export
+   writes Game Boy registers (checked with libvgm). Engines play both.
+5. **Desktop app** (Tauri 2): offline, native Save dialogs. CI builds installers for
+   Linux, Windows and macOS; it hasn't been run on this machine, which lacks
+   WebKitGTK, and the installers aren't code-signed.
+
+Not done:
+- **OAuth sign-in**, the **public gallery** with remixing, and the **Library** mode.
+- **More chips**: C64 SID, SN76489, YM2612 FM.
+- **Server conversion on a GPU** (the Pro plan lists it as coming; needs Phase 3b).
+- **AI helpers** (text to song or SFX), an accessibility audit, localization and an
+  onboarding tour.
+- Offline chip conversion in the desktop app works as in the browser (Basic Pitch is
+  bundled); there's no larger desktop-only model.
 
 ---
 

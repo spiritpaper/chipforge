@@ -6,7 +6,8 @@ for your games.
 - [Product & build plan](docs/PLAN.md)
 - [Design system](docs/DESIGN.md)
 
-**Status:** Phase 4 is done.
+**Status:** Phase 5 is done. Open source: see [LICENSING.md](LICENSING.md) and
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 - **SFX Lab** makes game sound effects: ten seeded presets plus random, mutate,
   fine-tune sliders, a history with kept sounds, WAV and zip export, share links.
@@ -19,6 +20,9 @@ for your games.
   and **Chip version** transcribes its notes, beat and drums (Basic Pitch on your GPU
   via WebGL) and rebuilds it as an editable chip song. Nothing is uploaded.
 
+- **Accounts and sync** (optional): sign in with an emailed link to sync songs and
+  sounds between devices and share songs by link. Run your own server with Docker
+  ([deploy/](deploy/README.md)); paid plans are off unless you turn them on.
 - **Desktop app** for Linux, Windows and macOS: the same app offline in a native
   window, with native Save dialogs ([desktop/](desktop/README.md)).
 - **Game engines** play songs live from tiny `.chipsong` files, with adaptive music
@@ -33,12 +37,14 @@ The web app runs in the browser and works offline after the first visit.
 
 | Path | What |
 |------|------|
-| `core/` | `chipcore`: the Rust sound chip (2 pulse, triangle, noise, APU mixer), tracker sequencer (`tracker.rs`, which also documents the `.chipsong` binary format), SFX synth and VGM export. Builds natively and to WASM. |
+| `core/` | `chipcore`: the Rust sound chips (NES 2A03 in `apu.rs`, Game Boy DMG in `gb.rs`, mixers in `chip.rs`), tracker sequencer (`tracker.rs`, which also documents the `.chipsong` binary format), SFX synth and VGM export. Builds natively and to WASM. |
 | `native/` | `chipforge`: the player as a C library (`include/chipforge.h`) for engines and native apps. |
 | `engines/godot/` | Godot 4 GDExtension (Rust): `ChipSongPlayer` node, `.chipsong` resources, demo project. |
 | `engines/unity/` | Unity package: C# wrapper, `ChipSongPlayer` component, `.chipsong` importer. |
 | `web/` | Svelte 5 + Vite app. `src/audio/` hosts the chip in an AudioWorklet. |
-| `api/` | FastAPI service stub, kept for optional server-side conversion (Phase 3b). |
+| `api/` | FastAPI server: email sign-in, sync, share links, plans and ZarinPal payments (SQLite or Postgres, Alembic migrations). |
+| `deploy/` | Self-hosting with Docker Compose: Caddy serves the app and HTTPS, plus the API. |
+| `desktop/` | Tauri 2 desktop app around the web app. |
 | `docs/` | Plan and design system. |
 
 ## Requirements
@@ -57,7 +63,7 @@ pnpm test             # Rust workspace, web and API tests
 pnpm build && pnpm --filter web e2e   # end-to-end checks in headless Chrome
 
 cargo run --release -p chipcore --example render_song -- song.chipsong song.wav   # render offline
-cargo run --release -p chipcore --example export_vgm -- song.chipsong song.vgm    # NES VGM
+cargo run --release -p chipcore --example export_vgm -- song.chipsong song.vgm    # VGM for the song's chip
 native/tests/c/run.sh                 # the C header against the shared library
 engines/godot/test.sh                 # Godot plugin, headless (GODOT=/path/to/godot)
 engines/unity/test.sh                 # Unity C# wrapper (needs the .NET SDK)
