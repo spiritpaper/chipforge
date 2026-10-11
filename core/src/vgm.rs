@@ -236,7 +236,12 @@ impl Writer {
                 if self.wave != Some(wave) {
                     // Wave RAM is only safely writable with the channel's DAC off.
                     self.write(dmg::WAVE_DAC, 0x00);
-                    for (i, pair) in gb::WAVES[wave as usize].chunks_exact(2).enumerate() {
+                    for (i, pair) in gb::WAVES[wave as usize]
+                        .as_chunks::<2>()
+                        .0
+                        .iter()
+                        .enumerate()
+                    {
                         self.force(dmg::WAVE_RAM + i as u8, (pair[0] << 4) | pair[1]);
                     }
                     self.wave = Some(wave);
@@ -460,7 +465,9 @@ mod tests {
         // 16-bit stereo PCM after a 44-byte header; keep the left channel.
         Some(
             wav[44..]
-                .chunks_exact(4)
+                .as_chunks::<4>()
+                .0
+                .iter()
                 .map(|f| i16::from_le_bytes([f[0], f[1]]) as f32 / 32768.0)
                 .collect(),
         )

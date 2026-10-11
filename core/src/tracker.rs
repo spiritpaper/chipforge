@@ -310,7 +310,9 @@ impl Song {
             .chunks_exact(rows * CHANNELS * CELL_LEN)
             .map(|pattern| {
                 pattern
-                    .chunks_exact(CHANNELS * CELL_LEN)
+                    .as_chunks::<{ CHANNELS * CELL_LEN }>()
+                    .0
+                    .iter()
                     .map(|row| {
                         std::array::from_fn(|ch| {
                             let c = &row[ch * CELL_LEN..(ch + 1) * CELL_LEN];

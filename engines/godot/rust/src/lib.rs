@@ -1,10 +1,14 @@
 //! ChipForge for Godot 4: plays `.chipsong` files (exported from the ChipForge web app)
-//! live on an emulated NES sound chip.
+//! live on an emulated NES or Game Boy sound chip.
 //!
 //! - [`ChipSong`] is a resource holding a song; `.chipsong` files load as one, so they
 //!   can be assigned in the Inspector and are included in exported games.
 //! - [`ChipSongPlayer`] is a node that plays a song with adaptive controls: switch
 //!   section on the bar line, mute channels as layers, change tempo, play once.
+
+// Clippy 1.99 flags the code `#[derive(GodotClass)]` generates for `base` fields, not
+// anything written here.
+#![allow(clippy::redundant_field_names)]
 
 use chipcore::chip::{CHANNELS, Chip};
 use chipcore::tracker::{DecodeError, Song};

@@ -6,6 +6,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
 dotnet=${DOTNET:-dotnet}
 out="$root/target/unity-tests"
+mkdir -p "$out"
 cargo build --quiet --manifest-path "$root/Cargo.toml" -p chipforge
 cargo run --quiet --manifest-path "$root/Cargo.toml" -p chipforge --example write_test_song -- "$out/test.chipsong"
 "$dotnet" build --nologo -v quiet -o "$out/bin" "$here/tests/ChipForge.Tests.csproj"
