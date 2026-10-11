@@ -6,19 +6,21 @@ self-host with docker compose (see deploy/).
 """
 
 import hashlib
+import json
 import re
 import secrets
 from collections import defaultdict, deque
 from datetime import timedelta
+from decimal import Decimal
 from time import monotonic
 from typing import Annotated, Any
 
 from fastapi import Body, Cookie, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session as DbSession
 
-from .billing import Gateway, GatewayError, ZarinPal
+from .billing import BTCPay, Gateway, GatewayError, Verified, ZarinPal, btcpay_signature_ok
 from .config import Settings, get_settings
 from .db import LoginToken, Payment, Session, SfxLibrary, Song, User, make_sessionmaker, now
 from .mail import send_sign_in
@@ -37,12 +39,28 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def create_app(settings: Settings | None = None, gateway: Gateway | None = None) -> FastAPI:
+def gateways_from(settings: Settings) -> list[Gateway]:
+    """The payment gateways whose credentials are set, in the order buyers see them."""
+    out: list[Gateway] = []
+    if settings.zarinpal_merchant_id:
+        out.append(ZarinPal(settings.zarinpal_merchant_id, sandbox=settings.zarinpal_sandbox))
+    if settings.btcpay_url and settings.btcpay_store_id and settings.btcpay_api_key:
+        out.append(
+            BTCPay(
+                settings.btcpay_url,
+                settings.btcpay_store_id,
+                settings.btcpay_api_key,
+                settings.btcpay_currency,
+            )
+        )
+    return out
+
+
+def create_app(settings: Settings | None = None, gateways: list[Gateway] | None = None) -> FastAPI:
     settings = settings or get_settings()
     sessions = make_sessionmaker(settings.database_url)
     plans = load_plans(settings.billing_enabled, settings.plans_file or None)
-    if gateway is None and settings.zarinpal_merchant_id:
-        gateway = ZarinPal(settings.zarinpal_merchant_id, sandbox=settings.zarinpal_sandbox)
+    by_name = {g.name: g for g in (gateways if gateways is not None else gateways_from(settings))}
     ip_requests: dict[str, deque[float]] = defaultdict(deque)
     app = FastAPI(
         title="ChipForge API",
@@ -149,10 +167,11 @@ def create_app(settings: Settings | None = None, gateway: Gateway | None = None)
         return response
 
     def billing_info() -> dict[str, Any]:
+        live = list(by_name.values()) if plans.enabled else []
         return {
             "enabled": plans.enabled,
-            "currency": plans.currency,
-            "checkout": plans.enabled and gateway is not None,
+            "checkout": bool(live),
+            "gateways": [{"id": g.name, "label": g.label, "currency": g.currency} for g in live],
             "plans": [p.public() for p in plans.plans.values()] if plans.enabled else [],
         }
 
@@ -331,23 +350,33 @@ def create_app(settings: Settings | None = None, gateway: Gateway | None = None)
         user: CurrentUser,
         plan_id: Annotated[str, Body(alias="plan")],
         period: Annotated[str, Body()],
+        gateway_name: Annotated[str | None, Body(alias="gateway")] = None,
     ) -> dict[str, str]:
-        if not plans.enabled or gateway is None:
+        if not plans.enabled or not by_name:
             raise HTTPException(503, "Payments aren't set up on this server.")
+        gateway = by_name.get(gateway_name) if gateway_name else next(iter(by_name.values()))
+        if gateway is None:
+            raise HTTPException(422, "No such payment method.")
         plan = plans.plans.get(plan_id)
-        amount = plan.prices.get(period) if plan else None
+        amount = plan.price(gateway.currency, period) if plan else None
         if not plan or not amount:
             raise HTTPException(422, "No such plan or period.")
         payment = Payment(
-            user_id=user.id, plan=plan.id, period=period, amount=amount, provider=gateway.name
+            user_id=user.id,
+            plan=plan.id,
+            period=period,
+            amount=str(amount),
+            currency=gateway.currency,
+            provider=gateway.name,
         )
         s.add(payment)
         s.flush()
         try:
             reference, url = gateway.start(
+                payment.id,
                 amount,
                 f"ChipForge {plan.name}, one {period}",
-                f"{settings.app_origin}/api/billing/{gateway.name}/callback",
+                gateway.return_url(settings.app_origin, payment.id),
                 user.email,
             )
         except GatewayError as e:
@@ -362,6 +391,42 @@ def create_app(settings: Settings | None = None, gateway: Gateway | None = None)
             f"{settings.app_origin}/#/account?payment={result}", status_code=303
         )
 
+    def settle(s: DbSession, payment: Payment, verified: Verified) -> str:
+        """Records what the gateway said; returns the result for the account page."""
+        if verified.status == "pending":
+            return "pending"
+        if verified.status != "paid":
+            s.execute(
+                update(Payment)
+                .where(Payment.id == payment.id, Payment.status != "paid")
+                .values(status=verified.status)
+            )
+            s.commit()
+            return verified.status
+        # The return link and a webhook can arrive together: only the request that
+        # flips the payment to paid extends the plan.
+        flipped = s.execute(
+            update(Payment)
+            .where(Payment.id == payment.id, Payment.status != "paid")
+            .values(status="paid", receipt=verified.receipt, paid_at=now())
+        ).rowcount
+        if flipped:
+            user = s.get(User, payment.user_id)
+            if user:
+                extend(user, payment.plan, payment.period)
+        s.commit()
+        return "ok"
+
+    def check(s: DbSession, payment: Payment) -> str:
+        """Asks the payment's gateway about it and settles it."""
+        if payment.status == "paid":
+            return "ok"
+        gateway = by_name.get(payment.provider)
+        if gateway is None or not payment.reference:
+            return "unknown"
+        # The amount comes from our record, never from the buyer or the callback.
+        return settle(s, payment, gateway.verify(payment.reference, Decimal(payment.amount)))
+
     @app.get("/api/billing/zarinpal/callback")
     def zarinpal_callback(
         s: Db,
@@ -371,29 +436,51 @@ def create_app(settings: Settings | None = None, gateway: Gateway | None = None)
         payment = s.scalar(
             select(Payment).where(Payment.reference == authority, Payment.provider == "zarinpal")
         )
-        if not payment or gateway is None or gateway.name != "zarinpal":
+        if not payment or "zarinpal" not in by_name:
             return back_to_account("unknown")
         if payment.status == "paid":
             return back_to_account("ok")
         if status != "OK":
-            payment.status = "cancelled"
-            s.commit()
-            return back_to_account("cancelled")
+            return back_to_account(settle(s, payment, Verified("cancelled")))
         try:
-            # The amount comes from our record, never from the callback.
-            verified = gateway.verify(authority, payment.amount)
+            return back_to_account(check(s, payment))
         except GatewayError:
             # Left pending: coming back to this link verifies again.
             return back_to_account("error")
-        if not verified.ok:
-            payment.status = "failed"
-            s.commit()
-            return back_to_account("failed")
-        user = s.get(User, payment.user_id)
-        if user:
-            extend(user, payment.plan, payment.period)
-        payment.status, payment.receipt, payment.paid_at = "paid", verified.receipt, now()
-        s.commit()
-        return back_to_account("ok")
+
+    @app.get("/api/billing/btcpay/return")
+    def btcpay_return(s: Db, payment_id: Annotated[str, Query(alias="payment")]) -> Response:
+        payment = s.get(Payment, payment_id)
+        if not payment or payment.provider != "btcpay":
+            return back_to_account("unknown")
+        try:
+            return back_to_account(check(s, payment))
+        except GatewayError:
+            return back_to_account("error")
+
+    @app.post("/api/billing/btcpay/webhook")
+    async def btcpay_webhook(request: Request) -> dict[str, bool]:
+        """BTCPay calls this as invoices change. Only the invoice id is taken from the
+        (signed) body; its state is then fetched from BTCPay itself."""
+        body = await request.body()
+        if not btcpay_signature_ok(
+            settings.btcpay_webhook_secret, body, request.headers.get("BTCPay-Sig")
+        ):
+            raise HTTPException(401, "Bad signature.")
+        try:
+            invoice_id = json.loads(body).get("invoiceId")
+        except (ValueError, AttributeError):
+            raise HTTPException(400, "Not a BTCPay webhook.") from None
+        with sessions() as s:
+            payment = s.scalar(
+                select(Payment).where(Payment.reference == invoice_id, Payment.provider == "btcpay")
+            )
+            if payment:
+                try:
+                    check(s, payment)
+                except GatewayError as e:
+                    # A failed delivery makes BTCPay try again later.
+                    raise HTTPException(502, str(e)) from e
+        return {"ok": True}
 
     return app

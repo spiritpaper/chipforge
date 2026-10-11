@@ -1,5 +1,4 @@
 {
-  "currency": "IRR",
   "plans": [
     {
       "id": "free",
@@ -17,7 +16,10 @@
       "share": true,
       "gpuConversion": false,
       "badge": true,
-      "prices": { "month": 1000000, "year": 10000000 }
+      "prices": {
+        "IRR": { "month": 1000000, "year": 10000000 },
+        "USD": { "month": 3, "year": 30 }
+      }
     },
     {
       "id": "pro",
@@ -26,7 +28,10 @@
       "share": true,
       "gpuConversion": true,
       "badge": true,
-      "prices": { "month": 3000000, "year": 30000000 }
+      "prices": {
+        "IRR": { "month": 3000000, "year": 30000000 },
+        "USD": { "month": 8, "year": 80 }
+      }
     }
   ]
 }

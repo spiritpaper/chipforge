@@ -248,10 +248,10 @@ class Account {
   }
 
   /** Starts paying for a plan period: sends the browser to the payment gateway. */
-  async checkout(plan: string, period: 'month' | 'year') {
+  async checkout(plan: string, period: 'month' | 'year', gateway: string) {
     this.error = null
     try {
-      const { url } = await api<{ url: string }>('/billing/checkout', { method: 'POST', json: { plan, period } })
+      const { url } = await api<{ url: string }>('/billing/checkout', { method: 'POST', json: { plan, period, gateway } })
       location.href = url
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err)

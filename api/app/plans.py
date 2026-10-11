@@ -1,13 +1,15 @@
 """Plans for a hosted service. Self-hosted servers leave BILLING_ENABLED unset, and every
 account gets everything.
 
-Plans come from app/plans.default.json or the file in PLANS_FILE. Prices are in the
-payment gateway's unit (Rial for ZarinPal) and are placeholders: set your own.
+Plans come from app/plans.default.json or the file in PLANS_FILE. Prices are listed per
+currency, one for each gateway you use (IRR for ZarinPal, USD or BTCPAY_CURRENCY for
+BTCPay), and are placeholders: set your own.
 """
 
 import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from .db import User, now
@@ -23,7 +25,11 @@ class Plan:
     share: bool
     gpu_conversion: bool
     badge: bool
-    prices: dict[str, int]
+    #: currency -> period -> amount
+    prices: dict[str, dict[str, Decimal]]
+
+    def price(self, currency: str, period: str) -> Decimal | None:
+        return self.prices.get(currency, {}).get(period)
 
     def public(self) -> dict:
         return {
@@ -33,8 +39,15 @@ class Plan:
             "share": self.share,
             "gpuConversion": self.gpu_conversion,
             "badge": self.badge,
-            "prices": self.prices,
+            "prices": {
+                currency: {period: _number(amount) for period, amount in periods.items()}
+                for currency, periods in self.prices.items()
+            },
         }
+
+
+def _number(amount: Decimal) -> int | float:
+    return int(amount) if amount == amount.to_integral_value() else float(amount)
 
 
 # What everyone gets when billing is off (self-hosting).
@@ -44,7 +57,6 @@ UNLIMITED = Plan("unlimited", "Unlimited", None, True, True, False, {})
 @dataclass(frozen=True)
 class Plans:
     enabled: bool
-    currency: str
     plans: dict[str, Plan]
 
     def effective(self, user: User, at: datetime | None = None) -> Plan:
@@ -60,25 +72,40 @@ class Plans:
 
 def load_plans(enabled: bool, path: str | None = None) -> Plans:
     file = Path(path) if path else Path(__file__).with_name("plans.default.json")
-    data = json.loads(file.read_text())
+    # Parse numbers as Decimal so 2.99 stays exactly 2.99.
+    data = json.loads(file.read_text(), parse_float=Decimal, parse_int=Decimal)
+
+    def prices(p: dict) -> dict[str, dict[str, Decimal]]:
+        raw = p.get("prices", {})
+        # The first format had one currency for the whole file: {"month": 1000000}.
+        if raw and all(not isinstance(v, dict) for v in raw.values()):
+            raw = {data.get("currency", "IRR"): raw}
+        out = {
+            cur.upper(): {period: Decimal(v) for period, v in periods.items()}
+            for cur, periods in raw.items()
+        }
+        for periods in out.values():
+            if unknown := set(periods) - set(PERIOD_DAYS):
+                raise ValueError(f"{file}: plan {p['id']} has unknown periods {unknown}")
+            if any(v <= 0 for v in periods.values()):
+                raise ValueError(f"{file}: plan {p['id']} has a price that isn't positive")
+        return out
+
     plans = {
         p["id"]: Plan(
             p["id"],
             p["name"],
-            p.get("maxSongs"),
+            int(p["maxSongs"]) if p.get("maxSongs") is not None else None,
             p["share"],
             p["gpuConversion"],
             p["badge"],
-            p.get("prices", {}),
+            prices(p),
         )
         for p in data["plans"]
     }
     if "free" not in plans:
         raise ValueError(f"{file}: a plan with id 'free' is required")
-    for plan in plans.values():
-        if unknown := set(plan.prices) - set(PERIOD_DAYS):
-            raise ValueError(f"{file}: plan {plan.id} has unknown periods {unknown}")
-    return Plans(enabled, data.get("currency", "IRR"), plans)
+    return Plans(enabled, plans)
 
 
 def extend(user: User, plan_id: str, period: str, at: datetime | None = None) -> None:

@@ -5,6 +5,8 @@ describe('billing display', () => {
   it('formats prices in the gateway currency', () => {
     expect(formatPrice(1_000_000, 'IRR')).toMatch(/1,000,000/)
     expect(formatPrice(5, 'NOT-A-CURRENCY')).toBe('5 NOT-A-CURRENCY')
+    expect(formatPrice(3, 'USD')).toBe('$3')
+    expect(formatPrice(2.5, 'USD')).toBe('$2.50')
   })
 
   it('describes plans in plain words', () => {
@@ -16,6 +18,6 @@ describe('billing display', () => {
   })
 
   it('has a message for every payment result the server sends', () => {
-    expect(Object.keys(PAYMENT_RESULTS).sort()).toEqual(['cancelled', 'error', 'failed', 'ok', 'unknown'])
+    expect(Object.keys(PAYMENT_RESULTS).sort()).toEqual(['cancelled', 'error', 'failed', 'ok', 'pending', 'unknown'])
   })
 })

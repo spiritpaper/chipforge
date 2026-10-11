@@ -44,6 +44,17 @@ class Settings:
             os.environ.get("ZARINPAL_SANDBOX", "").lower() in {"1", "true", "yes"}
         )
     )
+    # BTCPay Server (crypto): the server's URL, a store id, a Greenfield API key, and the
+    # secret of a webhook pointing at /api/billing/btcpay/webhook.
+    btcpay_url: str = field(default_factory=lambda: os.environ.get("BTCPAY_URL", ""))
+    btcpay_store_id: str = field(default_factory=lambda: os.environ.get("BTCPAY_STORE_ID", ""))
+    btcpay_api_key: str = field(default_factory=lambda: os.environ.get("BTCPAY_API_KEY", ""))
+    btcpay_webhook_secret: str = field(
+        default_factory=lambda: os.environ.get("BTCPAY_WEBHOOK_SECRET", "")
+    )
+    btcpay_currency: str = field(
+        default_factory=lambda: os.environ.get("BTCPAY_CURRENCY", "USD").upper()
+    )
 
     @property
     def secure_cookies(self) -> bool:

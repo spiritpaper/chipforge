@@ -184,9 +184,10 @@ Built:
    smoke-tested in CI.
 3. **Plans**: Free / Supporter / Pro from an editable JSON file, enforced by the
    server (402 with a plain message; songs over the limit stay on the device).
-   Prepaid months or years through ZarinPal, plus an admin command to grant plans.
-   Off by default, so self-hosted servers have no limits. The gateway is tested
-   against a fake ZarinPal only; test in their sandbox before taking money.
+   Prepaid months or years by card through ZarinPal or in crypto through BTCPay
+   Server (confirmed by signed webhooks), plus an admin command to grant plans.
+   Off by default, so self-hosted servers have no limits. Both gateways are tested
+   against stand-ins for their APIs only; make real test payments before launch.
 4. **Game Boy chip**: two pulses, the 4-bit wave channel with eight waveforms, and
    noise with its 7-bit mode. Any song switches between NES and Game Boy; VGM export
    writes Game Boy registers (checked with libvgm). Engines play both.
