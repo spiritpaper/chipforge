@@ -7,20 +7,31 @@ export interface PlanInfo {
   share: boolean
   gpuConversion: boolean
   badge: boolean
-  prices: Partial<Record<'month' | 'year', number>>
+  /** currency → period → amount */
+  prices: Record<string, Partial<Record<Period, number>>>
   until?: string | null
+}
+
+export type Period = 'month' | 'year'
+
+/** A way to pay that this server has set up, with the currency its prices are in. */
+export interface GatewayInfo {
+  id: string
+  label: string
+  currency: string
 }
 
 export interface BillingInfo {
   enabled: boolean
-  currency: string
   checkout: boolean
+  gateways: GatewayInfo[]
   plans: PlanInfo[]
 }
 
 export function formatPrice(amount: number, currency: string): string {
   try {
-    return new Intl.NumberFormat('en', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
+    const digits = Number.isInteger(amount) ? 0 : 2
+    return new Intl.NumberFormat('en', { style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount)
   } catch {
     return `${amount.toLocaleString('en')} ${currency}`
   }
@@ -38,6 +49,7 @@ export function planFeatures(p: PlanInfo): string[] {
 /** Result messages for ?payment=… after returning from the gateway (ok null: neutral). */
 export const PAYMENT_RESULTS: Record<string, { ok: boolean | null; text: string }> = {
   ok: { ok: true, text: 'Payment received. Thank you! Your plan is active.' },
+  pending: { ok: null, text: "Payment received; waiting for it to confirm on the network. Your plan starts by itself once it does, usually within an hour. You can close this page." },
   cancelled: { ok: null, text: 'Payment cancelled. Nothing was charged.' },
   failed: { ok: false, text: "The payment didn't go through. Nothing was charged." },
   error: { ok: false, text: "We couldn't confirm the payment with the gateway yet. If you were charged, it will be applied; contact support if it isn't within a day." },

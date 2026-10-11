@@ -32,7 +32,7 @@ def main(argv: list[str]) -> int:
                 select(Payment).where(Payment.user_id == user.id).order_by(Payment.created_at)
             ):
                 print(
-                    f"  {p.created_at:%Y-%m-%d} {p.plan}/{p.period} {p.amount} {p.status} {p.receipt or ''}"
+                    f"  {p.created_at:%Y-%m-%d} {p.plan}/{p.period} {p.amount} {p.currency} {p.status} {p.receipt or ''}"
                 )
         return 0
     if len(argv) == 4 and argv[0] == "grant":

@@ -91,15 +91,21 @@
               <h3>{p.name}</h3>
               <ul>{#each planFeatures(p) as f, i (i)}<li>{f}</li>{/each}</ul>
               {#if account.billing.checkout}
-                <div class="row">
-                  {#each ['month', 'year'] as const as period (period)}
-                    {#if p.prices[period]}
-                      <button class="key" onclick={() => account.checkout(p.id, period)}>
-                        {p.id === account.plan.id ? 'Add' : 'Pay for'} a {period}: {formatPrice(p.prices[period]!, account.billing.currency)}
-                      </button>
-                    {/if}
-                  {/each}
-                </div>
+                {#each account.billing.gateways.filter((g) => p.prices[g.currency]) as g (g.id)}
+                  <div class="pay" role="group" aria-label="{p.name} with {g.label}">
+                    <span class="muted">{g.label}</span>
+                    <div class="row">
+                      {#each ['month', 'year'] as const as period (period)}
+                        {@const amount = p.prices[g.currency][period]}
+                        {#if amount}
+                          <button class="key" onclick={() => account.checkout(p.id, period, g.id)}>
+                            {p.id === account.plan.id ? 'Add' : 'Pay for'} a {period}: {formatPrice(amount, g.currency)}
+                          </button>
+                        {/if}
+                      {/each}
+                    </div>
+                  </div>
+                {/each}
               {:else}
                 <p class="muted">Payments aren't set up on this server yet.</p>
               {/if}
@@ -198,6 +204,12 @@
     border: 1px solid var(--line);
     border-radius: var(--radius-key);
     background: var(--panel);
+  }
+
+  .pay {
+    display: flex;
+    flex-direction: column;
+    gap: var(--u);
   }
 
   .card.current {

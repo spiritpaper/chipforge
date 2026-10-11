@@ -36,16 +36,17 @@ class User(Base):
 
 
 class Payment(Base):
-    """One checkout. Amounts are in the gateway's currency unit (Rial for ZarinPal)."""
+    """One checkout, for `amount` (a decimal string) in `currency`."""
 
     __tablename__ = "payments"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     plan: Mapped[str] = mapped_column(String(32))
     period: Mapped[str] = mapped_column(String(16))
-    amount: Mapped[int] = mapped_column(Integer)
+    amount: Mapped[str] = mapped_column(String(32))
+    currency: Mapped[str] = mapped_column(String(8), server_default="IRR")
     provider: Mapped[str] = mapped_column(String(32))
-    # The gateway's id for this checkout (ZarinPal: "authority").
+    # The gateway's id for this checkout (ZarinPal: "authority", BTCPay: invoice id).
     reference: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="pending")
     receipt: Mapped[str | None] = mapped_column(String(128), nullable=True)
