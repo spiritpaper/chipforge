@@ -12,6 +12,23 @@ then download them from the run's artifacts. The builds aren't code-signed yet, 
 Windows SmartScreen and macOS Gatekeeper will warn the first time (on macOS,
 right-click the app → Open).
 
+## Releasing
+
+1. Set the version in `desktop/src-tauri/tauri.conf.json` (and `desktop/src-tauri/Cargo.toml`,
+   `web/package.json` to match), commit and push.
+2. Tag the commit and push the tag:
+   ```sh
+   git tag -a v0.1.0 -m "ChipForge 0.1.0"
+   git push origin v0.1.0
+   ```
+   A suffix such as `v0.1.0-rc.1` makes a pre-release, handy for trying the process.
+3. The Desktop workflow checks the tag matches the version, builds the installers and
+   drafts a release with them attached and notes generated from the commits. Review it
+   under **Releases**, then press **Publish release**.
+
+To throw away a trial run, delete the draft on the Releases page, then the tag:
+`git push origin :v0.1.0-rc.1 && git tag -d v0.1.0-rc.1`.
+
 ## Build it yourself
 
 You need Rust, Node 24 with pnpm, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/)
