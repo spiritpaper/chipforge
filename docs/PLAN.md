@@ -7,6 +7,8 @@ Users:
 
 - **Indie game devs** who need SFX and a soundtrack fast, without music training.
 - **Chiptune hobbyists** who want a modern, friendly tracker.
+- **Video creators** (YouTubers, streamers) who need background tracks and sound
+  effects they're free to use.
 - **Curious listeners** who want to hear their favorite song "as an NES game".
 
 Each phase ends with something shippable. Phases are sequential; steps inside a phase
@@ -203,6 +205,61 @@ Not done:
   onboarding tour.
 - Offline chip conversion in the desktop app works as in the browser (Basic Pitch is
   bundled); there's no larger desktop-only model.
+
+---
+
+## Phase 6 — Growth: from first sound to community
+
+The goal is getting people from opening the app to a usable sound in about a minute,
+then giving them reasons to bring others in. Ordered by value for effort; the first
+three are next.
+
+### 6a — Before traction (cheap, high value)
+1. **Royalty-free, said plainly**: "Everything you make is yours: royalty-free, use
+   it anywhere, no credit required" on the home page and next to every export (also
+   in the exported files' metadata and a LICENSE.txt in packs).
+2. **SFX variations and packs**: a **Variations** button that makes 10 takes on the
+   current sound to pick from, starter presets (Coin, Jump, Hit, Power-up, Laser,
+   Explosion, Menu), and exporting a whole pack as a zip with sensible file names in
+   WAV and OGG.
+3. **Engine stores**: list the Godot plugin in the Godot Asset Library and the Unity
+   wrapper in the Asset Store; every listing is free discovery.
+4. **Song templates**: Overworld, Boss fight, Menu loop, Victory jingle, Game over.
+5. **Exports for each audience**:
+   - Game devs: seamless loops (loop point kept, no click at the seam) and packs.
+   - Video creators: fit a track to a length ("make it 3:20"), MP3, and stems so a
+     voice-over can sit on top.
+6. **More engines**: export for Phaser/JS, GameMaker and Defold.
+7. **Game jams**: sponsor Ludum Dare, GMTK and itch.io jams with free Pro during the
+   jam and a "Made with ChipForge" badge.
+
+### 6b — Community, once people show up
+1. **Public gallery with remixing**: share links made browsable; "Remix this" copies
+   a song into your own projects, crediting the original.
+2. **Discord** and short "make this sound in 30 seconds" videos (Shorts, TikTok).
+
+### 6c — If it takes off
+1. **Adaptive music**: songs in layers that the Godot and Unity plugins fade in and
+   out by an intensity value (exploring → combat). A clear differentiator.
+2. **More chips as Pro features**: C64 SID, Sega Genesis (YM2612 FM), a PICO-8 style.
+3. **AI helpers**: describe a sound in words to get its settings ("a laser that
+   fades down"); hum a tune to get a melody, building on the converter.
+4. **Working together**: live co-editing of a song, and a Team plan for studios.
+5. **Sound-pack marketplace**: creators sell packs and keep most of the revenue.
+   Only once the community exists.
+6. **Plans**: Free stays genuinely useful (the open-source core earns trust). Pro adds
+   more chips, stems, adaptive music, cloud storage and bigger packs; Team and
+   education pricing.
+
+### What to measure
+- **Activation**: share of new users who export something within 5 minutes.
+- **Weekly exporters**: people who export at least once a week.
+- **Share-link visits**: visitors arriving through shared songs and sounds.
+- **Template use**: which SFX presets and song templates are used, to pick what to
+  build next.
+
+Measure without tracking people: count events on the server (or with a
+privacy-friendly, cookieless tool), never send song contents.
 
 ---
 
