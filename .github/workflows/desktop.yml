@@ -1,9 +1,12 @@
 name: Desktop
 
 # Desktop builds take a while, so they run when the desktop app changes, for
-# version tags, and on demand (Actions → Desktop → Run workflow). A version tag
-# (v0.1.0, or v0.1.0-rc.1 for a pre-release) also drafts a GitHub release with
-# the installers attached; publish it from the Releases page.
+# version tags, and on demand (Actions → Desktop → Run workflow).
+#
+# Releases are automatic: when main has an app version (desktop/src-tauri/tauri.conf.json)
+# with no release yet, the installers are published as release v<version>, which also
+# creates the tag. Pushing a tag by hand does the same; a tag with a suffix, such as
+# v0.2.0-rc.1 while the app version is 0.2.0, makes a pre-release for trying things out.
 on:
   workflow_dispatch:
   push:
@@ -15,7 +18,39 @@ on:
     paths: ["desktop/**", ".github/workflows/desktop.yml"]
 
 jobs:
+  # Decides whether this run publishes a release, and under which tag.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      release: ${{ steps.plan.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: plan
+        run: |
+          version=$(node -p "require('./desktop/src-tauri/tauri.conf.json').version")
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag=$GITHUB_REF_NAME
+            tag_version=${tag#v}
+            if [ "${tag_version%%-*}" != "$version" ]; then
+              echo "::error::tag $tag doesn't match the app version $version (desktop/src-tauri/tauri.conf.json)"
+              exit 1
+            fi
+            release=true
+          elif [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ] \
+              && [ -z "$(git ls-remote --tags origin "refs/tags/v$version")" ]; then
+            tag=v$version
+            release=true
+          else
+            tag=v$version
+            release=false
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "Version $version, tag $tag, release: $release"
+
   build:
+    needs: plan
     strategy:
       fail-fast: false
       matrix:
@@ -29,16 +64,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      - name: Check the tag matches the app version
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: bash
-        run: |
-          version=$(node -p "require('./desktop/src-tauri/tauri.conf.json').version")
-          tag=${GITHUB_REF_NAME#v}
-          if [ "${tag%%-*}" != "$version" ]; then
-            echo "::error::tag $GITHUB_REF_NAME doesn't match the app version $version (desktop/src-tauri/tauri.conf.json)"
-            exit 1
-          fi
       - name: Install WebKitGTK and friends
         if: runner.os == 'Linux'
         run: |
@@ -68,8 +93,8 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    if: needs.plan.outputs.release == 'true'
+    needs: [plan, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -78,12 +103,13 @@ jobs:
         with:
           path: installers
           merge-multiple: true
-      - name: Draft the release
+      - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
         run: |
-          # Tags with a suffix (v0.1.0-rc.1) are marked as pre-releases.
-          prerelease=$([[ "$GITHUB_REF_NAME" == *-* ]] && echo --prerelease || true)
-          gh release create "$GITHUB_REF_NAME" installers/* \
-            --repo "$GITHUB_REPOSITORY" --title "ChipForge $GITHUB_REF_NAME" \
-            --draft --generate-notes --verify-tag $prerelease
+          prerelease=$([[ "$TAG" == *-* ]] && echo --prerelease || true)
+          # Creates the tag on this commit if it doesn't exist yet.
+          gh release create "$TAG" installers/* \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "ChipForge $TAG" \
+            --generate-notes $prerelease

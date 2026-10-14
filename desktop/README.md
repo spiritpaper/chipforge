@@ -6,28 +6,35 @@ is no account page, because sync needs a ChipForge server; use the web app for t
 
 ## Download
 
-GitHub Actions builds installers (AppImage, .deb, .rpm, .msi, .exe and .dmg) when the
-desktop app changes, for `v*` tags, and on demand: **Actions → Desktop → Run workflow**,
-then download them from the run's artifacts. The builds aren't code-signed yet, so
-Windows SmartScreen and macOS Gatekeeper will warn the first time (on macOS,
-right-click the app → Open).
+Installers (AppImage, .deb, .rpm, .msi, .exe and .dmg) are on the
+[Releases page](https://github.com/spiritpaper/chipforge/releases). GitHub Actions also
+builds them when the desktop app changes and on demand (**Actions → Desktop → Run
+workflow**), as artifacts of the run. The builds aren't code-signed yet, so Windows
+SmartScreen and macOS Gatekeeper will warn the first time (on macOS, right-click the
+app → Open).
 
 ## Releasing
 
-1. Set the version in `desktop/src-tauri/tauri.conf.json` (and `desktop/src-tauri/Cargo.toml`,
-   `web/package.json` to match), commit and push.
-2. Tag the commit and push the tag:
-   ```sh
-   git tag -a v0.1.0 -m "ChipForge 0.1.0"
-   git push origin v0.1.0
-   ```
-   A suffix such as `v0.1.0-rc.1` makes a pre-release, handy for trying the process.
-3. The Desktop workflow checks the tag matches the version, builds the installers and
-   drafts a release with them attached and notes generated from the commits. Review it
-   under **Releases**, then press **Publish release**.
+Releases are automatic. To ship a new version:
 
-To throw away a trial run, delete the draft on the Releases page, then the tag:
-`git push origin :v0.1.0-rc.1 && git tag -d v0.1.0-rc.1`.
+1. Set the version in `desktop/src-tauri/tauri.conf.json` (and in
+   `desktop/src-tauri/Cargo.toml` and `web/package.json` to match).
+2. Commit and push to `main`.
+
+When `main` has a version with no release yet, the Desktop workflow builds the
+installers and publishes them as release `v<version>`, with notes generated from the
+commits, and creates the tag. Pushes that keep the same version don't make a release.
+
+To try the process without a real release, push a tag with a suffix; it becomes a
+pre-release:
+
+```sh
+git tag -a v0.2.0-rc.1 -m "ChipForge 0.2.0 rc 1"   # the app version must be 0.2.0
+git push origin v0.2.0-rc.1
+```
+
+To remove it, delete the release on the Releases page, then the tag:
+`git push origin :v0.2.0-rc.1 && git tag -d v0.2.0-rc.1`.
 
 ## Build it yourself
 

@@ -1,7 +1,7 @@
 # Security policy
 
 Please report security problems privately, not in public issues: use
-[Report a vulnerability](https://github.com/Hamidspirit/chipforge/security/advisories/new)
+[Report a vulnerability](https://github.com/spiritpaper/chipforge/security/advisories/new)
 on GitHub (the repository's Security tab). Include steps to reproduce and what an
 attacker could do.
 

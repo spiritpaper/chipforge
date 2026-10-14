@@ -28,7 +28,7 @@
     "category": "Music",
     "shortDescription": "Make chiptune music and sound effects",
     "longDescription": "Turn music into 8-bit, write chiptune songs on emulated NES and Game Boy chips, and make sound effects for games.",
-    "copyright": "Copyright (c) 2026 Hamid Spirit and ChipForge contributors",
+    "copyright": "Copyright (c) 2026 spiritpaper and ChipForge contributors",
     "license": "AGPL-3.0-only",
     "icon": [
       "icons/32x32.png",
