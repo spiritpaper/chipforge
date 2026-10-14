@@ -109,7 +109,13 @@ jobs:
           TAG: ${{ needs.plan.outputs.tag }}
         run: |
           prerelease=$([[ "$TAG" == *-* ]] && echo --prerelease || true)
-          # Creates the tag on this commit if it doesn't exist yet.
-          gh release create "$TAG" installers/* \
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "ChipForge $TAG" \
-            --generate-notes $prerelease
+          ls -l installers
+          # Creates the tag on this commit if it doesn't exist yet. Errors become an
+          # annotation, so they show on the run's summary page.
+          if ! out=$(gh release create "$TAG" installers/* \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "ChipForge $TAG" \
+              --generate-notes $prerelease 2>&1); then
+            echo "::error title=gh release create failed::${out//$'\n'/%0A}"
+            exit 1
+          fi
+          echo "$out"
