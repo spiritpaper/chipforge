@@ -109,10 +109,12 @@ jobs:
           TAG: ${{ needs.plan.outputs.tag }}
         run: |
           prerelease=$([[ "$TAG" == *-* ]] && echo --prerelease || true)
-          ls -l installers
+          # The artifacts keep the bundle folders (appimage/, deb/, msi/, ...).
+          mapfile -t files < <(find installers -type f | sort)
+          printf '%s\n' "${files[@]}"
           # Creates the tag on this commit if it doesn't exist yet. Errors become an
           # annotation, so they show on the run's summary page.
-          if ! out=$(gh release create "$TAG" installers/* \
+          if ! out=$(gh release create "$TAG" "${files[@]}" \
               --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "ChipForge $TAG" \
               --generate-notes $prerelease 2>&1); then
             echo "::error title=gh release create failed::${out//$'\n'/%0A}"
