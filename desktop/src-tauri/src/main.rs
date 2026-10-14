@@ -33,10 +33,20 @@ async fn save_file(app: tauri::AppHandle, request: Request<'_>) -> Result<bool, 
     Ok(true)
 }
 
+/// Where the app's Support link goes. Keep in sync with SUPPORT_URL in web/src/lib/support.ts.
+const SUPPORT_URL: &str = "https://spiritpaper.github.io/#support";
+
+/// Opens the support page in the system browser. The address is fixed here, so the
+/// web view can't use this to open arbitrary links.
+#[tauri::command]
+fn open_support_page() -> Result<(), String> {
+    tauri_plugin_opener::open_url(SUPPORT_URL, None::<&str>).map_err(|e| e.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![save_file])
+        .invoke_handler(tauri::generate_handler![save_file, open_support_page])
         .run(tauri::generate_context!())
         .expect("ChipForge could not start");
 }

@@ -1,6 +1,6 @@
 [package]
 name = "chipforge-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "ChipForge as a desktop app"
 edition = "2024"
 license = "AGPL-3.0-only"
@@ -17,6 +17,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 percent-encoding = "2"
+tauri-plugin-opener = "2"
 
 [profile.release]
 lto = true

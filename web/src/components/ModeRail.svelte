@@ -1,7 +1,8 @@
 <script lang="ts">
   import PixelIcon, { type GlyphName } from './PixelIcon.svelte'
   import type { Mode } from '../lib/hash'
-  import { isDesktop } from '../lib/desktop'
+  import { isDesktop, openSupportPage } from '../lib/desktop'
+  import { SUPPORT_URL } from '../lib/support'
 
   let { current }: { current: Mode } = $props()
 
@@ -21,6 +22,13 @@
     // The desktop app works offline, with no server to sign in to.
     ...(isDesktop ? [] : [{ label: 'Account', icon: 'person', mode: 'account' } satisfies RailItem]),
   ]
+
+  // In the desktop app a new-window link does nothing, so the system browser opens it.
+  function openSupport(event: MouseEvent) {
+    if (!isDesktop) return
+    event.preventDefault()
+    void openSupportPage()
+  }
 </script>
 
 <nav class="rail" aria-label="Modes">
@@ -43,6 +51,12 @@
       </li>
     {/each}
   </ul>
+  {#if SUPPORT_URL}
+    <a class="mode support" href={SUPPORT_URL} target="_blank" rel="noopener noreferrer" onclick={openSupport}>
+      <PixelIcon name="heart" size={24} />
+      <span>Support</span>
+    </a>
+  {/if}
 </nav>
 
 <style>
@@ -109,6 +123,10 @@
     color: var(--muted);
   }
 
+  .support {
+    margin-top: auto;
+  }
+
   .soon {
     font-size: 10px;
     color: var(--muted);
@@ -138,6 +156,11 @@
 
     .mode {
       min-height: 44px;
+    }
+
+    .support {
+      width: auto;
+      margin-top: 0;
     }
   }
 </style>

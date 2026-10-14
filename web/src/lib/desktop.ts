@@ -10,3 +10,9 @@ export async function saveFile(data: BlobPart, filename: string): Promise<boolea
   const bytes = await new Blob([data]).arrayBuffer()
   return invoke<boolean>('save_file', bytes, { headers: { 'x-file-name': encodeURIComponent(filename) } })
 }
+
+/** Opens the support page in the system browser (links can't open new windows in the app). */
+export async function openSupportPage(): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core')
+  await invoke('open_support_page')
+}
