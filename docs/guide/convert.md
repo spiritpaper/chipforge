@@ -75,11 +75,13 @@ Afterwards, the **Parts** list lets you:
 - **The first time**, it downloads the Demucs model (84 MB) from its author's Hugging
   Face page. It's checked and kept in your browser, so later splits start straight
   away and work offline. Nothing is uploaded.
-- **Speed:** on the processor, splitting takes about twice as long as the song (a
-  3-minute song, around 6 minutes, on our test machine), then finding the notes in
-  each part takes a little longer than usual. With a graphics card the browser can use
-  (WebGPU, in recent Chrome and Edge) splitting runs on that instead and is faster. The
-  progress bar says which one it's using.
+- **Speed:** with a graphics card the browser can use (WebGPU, in recent Chrome and
+  Edge), splitting runs on that. Otherwise it uses up to 8 processor cores, and takes
+  about as long as the song on our 8-core test machine (longer with fewer cores). Then
+  ChipForge finds the notes in each part; parts that are silent, like the vocals of an
+  instrumental, are skipped. The progress bar says what it's using.
+- The very first time you open ChipForge in a browser, the page reloads itself once
+  after a moment. That lets the part splitter use all your processor cores.
 - Songs up to 10 minutes can be split. A split song needs a few hundred MB of memory
   while it works.
 

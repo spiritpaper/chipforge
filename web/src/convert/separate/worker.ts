@@ -17,7 +17,7 @@ export interface SeparateRequest {
 }
 
 export type SeparateMessage =
-  | { type: 'progress'; stage: 'download' | 'loading' | 'separating'; fraction: number; backend?: Backend }
+  | { type: 'progress'; stage: 'download' | 'loading' | 'separating'; fraction: number; backend?: Backend; threads?: number }
   | { type: 'done'; parts: Float32Array[]; backend: Backend }
   | { type: 'error'; error: string }
 
@@ -26,8 +26,10 @@ export type Backend = 'webgpu' | 'wasm'
 const post = (m: SeparateMessage, transfer: Transferable[] = []) => postMessage(m, { transfer })
 
 ort.env.wasm.wasmPaths = { wasm: ortWasm, mjs: ortMjs }
-// Several threads need a cross-origin isolated page; one always works.
-ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1
+// Several threads need a cross-origin isolated page (see public/sw.js); one always
+// works. Up to 8, leaving a core for the page.
+const threads = self.crossOriginIsolated ? Math.min(8, Math.max(1, (navigator.hardwareConcurrency || 2) - 1)) : 1
+ort.env.wasm.numThreads = threads
 
 async function hasWebGpu(): Promise<boolean> {
   try {
@@ -53,7 +55,7 @@ self.onmessage = async (e: MessageEvent<SeparateRequest>) => {
       net = await createNetwork(ort, graph, weights, ['wasm'])
     }
     const { left, right } = e.data
-    const parts = await separate(left, right, net, (fraction) => post({ type: 'progress', stage: 'separating', fraction, backend }))
+    const parts = await separate(left, right, net, (fraction) => post({ type: 'progress', stage: 'separating', fraction, backend, threads }))
     post({ type: 'done', parts, backend }, parts.map((p) => p.buffer))
   } catch (err) {
     post({ type: 'error', error: err instanceof Error ? err.message : String(err) })

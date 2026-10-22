@@ -223,15 +223,15 @@ then giving them reasons to bring others in. Ordered by value for effort.
   Runtime Web (WebGPU, or WebAssembly), each part transcribed onto its own channel, and
   parts to listen to, leave out or download. The weights download from the author's
   Hugging Face page on first use; their license was removed on 31 August 2026, a known
-  risk the owner accepted. Revisit if the author states terms.
+  risk the owner accepted. Revisit if the author states terms. The page is
+  cross-origin isolated (the service worker adds COOP/COEP on GitHub Pages; Caddy and
+  Tauri send them), so the processor fallback runs on up to 8 threads, and silent parts
+  skip note finding: about 2.5× faster than the first version, same output.
 - **Next:**
-  1. **Faster splitting without a GPU**: multi-threaded WebAssembly needs a
-     cross-origin isolated page (COOP/COEP headers, which GitHub Pages can't send; the
-     service worker could add them).
-  2. **Ready-made plugin downloads**: build the Godot addon (with its libraries for
+  1. **Ready-made plugin downloads**: build the Godot addon (with its libraries for
      Windows, macOS and Linux) and the Unity package in the release workflow, so game
      developers don't need Rust. Needed before the engine-store listings (6a.3).
-  3. The rest of 6a, starting with SFX variations and packs.
+  2. The rest of 6a, starting with SFX variations and packs.
 
 ### 6a — Before traction (cheap, high value)
 1. **Royalty-free, said plainly**: "Everything you make is yours: royalty-free, use

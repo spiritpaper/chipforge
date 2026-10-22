@@ -39,6 +39,15 @@ export type ListenMessage =
 
 const post = (m: ListenMessage) => postMessage(m)
 
+/** About -50 dBFS: below this a separated part counts as silent. */
+const SILENT_RMS = 0.003
+
+function rms(samples: Float32Array): number {
+  let sum = 0
+  for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i]
+  return Math.sqrt(sum / Math.max(1, samples.length))
+}
+
 // Errors thrown asynchronously inside TensorFlow.js escape the try/catch below and
 // would leave the page waiting forever; report them instead.
 self.addEventListener('error', (e) => post({ type: 'error', error: `${e.message} ${e.error?.stack ?? ''}` }))
@@ -58,6 +67,12 @@ self.onmessage = async (e: MessageEvent<ListenRequest>) => {
     const sources = parts ? [parts.vocals, parts.other, parts.bass] : [samples]
     const heard: HeardNote[][] = []
     for (const [i, source] of sources.entries()) {
+      // A part that's all but silent (no singing, say) holds only faint bleed from the
+      // others; listening to it would just invent notes.
+      if (parts && rms(source) < SILENT_RMS) {
+        heard.push([])
+        continue
+      }
       const notes = await transcribe(model, source, (f) =>
         post({ type: 'progress', stage: 'notes', fraction: (i + f) / sources.length, backend }),
       )

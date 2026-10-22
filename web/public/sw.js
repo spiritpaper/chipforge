@@ -17,6 +17,17 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+// Cross-origin isolation lets the part splitter (Convert → Split into parts) run on
+// every processor core. It needs these two headers on the page and its workers, which
+// static hosts like GitHub Pages can't send, so the service worker adds them.
+function isolated(response) {
+  if (!response || response.type === 'opaque' || response.status === 0) return response
+  const headers = new Headers(response.headers)
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin')
+  headers.set('Cross-Origin-Embedder-Policy', 'require-corp')
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
@@ -24,15 +35,18 @@ self.addEventListener('fetch', (event) => {
 
   if (url.pathname.includes('/assets/')) {
     event.respondWith(
-      caches.match(request).then(
-        (hit) =>
-          hit ??
-          fetch(request).then((response) => {
-            const copy = response.clone()
-            if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, copy))
-            return response
-          }),
-      ),
+      caches
+        .match(request)
+        .then(
+          (hit) =>
+            hit ??
+            fetch(request).then((response) => {
+              const copy = response.clone()
+              if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, copy))
+              return response
+            }),
+        )
+        .then(isolated),
     )
     return
   }
@@ -45,7 +59,8 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE).then((cache) => cache.put('./', copy))
           return response
         })
-        .catch(() => caches.match('./')),
+        .catch(() => caches.match('./'))
+        .then(isolated),
     )
   }
 })

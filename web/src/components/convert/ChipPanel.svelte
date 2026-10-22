@@ -12,7 +12,12 @@
     separating: 'Splitting into parts…',
   }
   const MB = Math.round(WEIGHTS.bytes / 1e6)
-  const using = { webgpu: 'using your graphics card', wasm: 'graphics card unavailable, using the processor (slower)' }
+  const using = (backend: 'webgpu' | 'wasm', threads = 1) =>
+    backend === 'webgpu'
+      ? 'using your graphics card'
+      : threads > 1
+        ? `using ${threads} processor cores; a graphics card would be faster`
+        : 'using one processor core, which is slow; reloading the page may let it use more'
 
   $effect(() => {
     if (converter.split) void converter.checkSplitReady()
@@ -52,7 +57,7 @@
         </div>
         <p class="status" role="status">
           {SPLIT_STAGES[sp.stage]}{sp.stage === 'download' || sp.stage === 'separating' ? ` ${Math.round(sp.fraction * 100)}%` : ''}
-          {#if sp.backend}<span class="muted">({using[sp.backend]})</span>{/if}
+          {#if sp.backend}<span class="muted">({using(sp.backend, sp.threads)})</span>{/if}
         </p>
       {:else if converter.listening}
         {@const l = converter.listening}

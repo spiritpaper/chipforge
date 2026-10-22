@@ -63,6 +63,8 @@ export interface Separating {
   stage: 'decoding' | 'download' | 'loading' | 'separating'
   fraction: number
   backend?: Backend
+  /** Processor threads, when it runs on the processor. */
+  threads?: number
 }
 
 class Converter {
@@ -354,7 +356,7 @@ class Converter {
       const parts = await new Promise<Float32Array[]>((resolve, reject) => {
         worker.onmessage = (e: MessageEvent<SeparateMessage>) => {
           const m = e.data
-          if (m.type === 'progress') this.separating = { stage: m.stage, fraction: m.fraction, backend: m.backend }
+          if (m.type === 'progress') this.separating = { stage: m.stage, fraction: m.fraction, backend: m.backend, threads: m.threads }
           else if (m.type === 'done') resolve(m.parts)
           else reject(new Error(m.error))
         }
