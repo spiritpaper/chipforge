@@ -1,0 +1,19 @@
+// Screenshots on the home page.
+.shot {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1rem 0;
+  border: 1px solid #34305c;
+  border-radius: 6px;
+}
+
+.main-content .btn {
+  margin: 0 0.5rem 0.5rem 0;
+}
+
+// Channel colours, for the little legend on the home page.
+.ch-pulse1 { color: #f85898; }
+.ch-pulse2 { color: #f8b800; }
+.ch-tri { color: #3cbcfc; }
+.ch-noise { color: #d8b8f8; }

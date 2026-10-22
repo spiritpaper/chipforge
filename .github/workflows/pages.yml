@@ -1,0 +1,73 @@
+# The website, https://spiritpaper.site/chipforge/: the docs (site/build.sh gathers the
+# Markdown, GitHub's Jekyll builds it with the Just the Docs theme) with the web app
+# beside them at /chipforge/app/. The app needs no server there: sign-in, sync and share
+# links switch themselves off. Needs Settings → Pages → Source: GitHub Actions.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "*.md"
+      - "docs/**"
+      - "site/**"
+      - "deploy/README.md"
+      - "desktop/README.md"
+      - "engines/*/README.md"
+      - "web/**"
+      - "core/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Builds the WASM chip core, then the app for its place on the site.
+      - run: pnpm --filter web build
+        env:
+          CHIPFORGE_BASE: /chipforge/app/
+      - name: Gather the docs
+        run: sh site/build.sh _site_src
+      - uses: actions/configure-pages@v6
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./_site_src
+          destination: ./_site
+      - name: Put the app beside the docs
+        run: |
+          sudo chown -R "$(id -u)" _site
+          cp -R web/dist _site/app
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

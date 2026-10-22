@@ -9,3 +9,5 @@ web/src/audio/chipcore.wasm
 *.db
 *.db-journal
 deploy/.env
+_site_src/
+_site/

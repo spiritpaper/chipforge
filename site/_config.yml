@@ -1,0 +1,31 @@
+# The docs website (https://spiritpaper.site/chipforge/). site/build.sh gathers the pages
+# and the Pages workflow builds them with Jekyll and the Just the Docs theme. The web
+# app itself is published beside it, at /chipforge/app/.
+title: ChipForge
+description: "Make 8-bit sound effects and chiptune music for your games and videos, or turn any song into 8-bit. Free, open source, runs in your browser."
+url: "https://spiritpaper.site"
+baseurl: "/chipforge"
+
+remote_theme: just-the-docs/just-the-docs@v0.10.1
+plugins:
+  - jekyll-remote-theme
+  - jekyll-relative-links
+  - jekyll-seo-tag
+relative_links:
+  enabled: true
+  collections: false
+
+color_scheme: chipforge
+search_enabled: true
+heading_anchors: true
+back_to_top: true
+back_to_top_text: "Back to top"
+aux_links:
+  "Open the app":
+    - "https://spiritpaper.site/chipforge/app/"
+  "Download":
+    - "https://github.com/spiritpaper/chipforge/releases/latest"
+  "GitHub":
+    - "https://github.com/spiritpaper/chipforge"
+aux_links_new_tab: false
+footer_content: 'ChipForge is made by spiritpaper. <a href="https://spiritpaper.site/#support">Support the project</a> · <a href="https://github.com/spiritpaper/chipforge/issues">Bugs and ideas</a> · Open source (MIT and AGPL-3.0)'

@@ -3,6 +3,10 @@
 Turn your music into 8-bit chiptune, compose chip music, and make retro sound effects
 for your games.
 
+**[Open the app](https://spiritpaper.site/chipforge/app/)** ·
+**[Guides and docs](https://spiritpaper.site/chipforge/)** ·
+**[Download](https://github.com/spiritpaper/chipforge/releases/latest)**
+
 - [Product & build plan](docs/PLAN.md)
 - [Design system](docs/DESIGN.md)
 
@@ -45,7 +49,8 @@ The web app runs in the browser and works offline after the first visit.
 | `api/` | FastAPI server: email sign-in, sync, share links, plans and ZarinPal payments (SQLite or Postgres, Alembic migrations). |
 | `deploy/` | Self-hosting with Docker Compose: Caddy serves the app and HTTPS, plus the API. |
 | `desktop/` | Tauri 2 desktop app around the web app. |
-| `docs/` | Plan and design system. |
+| `site/` | The website (docs plus the hosted app), built by `.github/workflows/pages.yml`. |
+| `docs/` | User guides (`docs/guide/`), plan, design system and code signing policy. |
 
 ## Requirements
 

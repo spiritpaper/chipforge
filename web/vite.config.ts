@@ -6,6 +6,8 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 const api = { '/api': { target: process.env.CHIPFORGE_API ?? 'http://localhost:8000' } }
 
 export default defineConfig({
+  // Where the app is served from: "/" normally, "/chipforge/app/" on GitHub Pages.
+  base: process.env.CHIPFORGE_BASE ?? '/',
   plugins: [svelte()],
   server: { proxy: api },
   preview: { proxy: api },
