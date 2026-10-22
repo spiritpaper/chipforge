@@ -18,7 +18,8 @@ public-domain pieces (most classical music is a good start).
 ## Is anything uploaded?
 
 No. Sound effects, songs and conversions are all made on your device. Without an
-account nothing leaves it. With an account on a ChipForge server, your songs and
+account nothing leaves it. (**Split into parts** downloads the Demucs model the first
+time you use it; that's a download, nothing is sent.) With an account on a ChipForge server, your songs and
 sounds sync to that server so they reach your other devices.
 
 ## Does it work offline?

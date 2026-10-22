@@ -28,8 +28,9 @@ All of them use multi-factor authentication for GitHub and SignPath.
 
 The ChipForge desktop app does not transfer any information to other networked systems
 unless you ask it to: songs, sounds and conversions are made and kept on your computer.
-The only network action is the **Support** link, which opens a web page in your browser
-when you click it.
+It connects to the network only when you ask it to: the **Support** link opens a web
+page in your browser, and **Split into parts** in Convert downloads the Demucs model
+from Hugging Face the first time you use it (it sends nothing about you or your music).
 
 The web app works the same way. If you choose to sign in to a ChipForge server, your
 songs and sounds sync to that server, as described in [Self-hosting](../deploy/README.md).

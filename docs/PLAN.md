@@ -219,12 +219,15 @@ then giving them reasons to bring others in. Ordered by value for effort.
   piano roll and tracker; the royalty-free promise in the docs and LICENSING.md.
 - **In progress:** signed Windows installers through SignPath Foundation (free for open
   source; see the [Code signing policy](CODE_SIGNING.md)).
+- **Done:** **Split into parts** in Convert: Demucs (htdemucs) in the browser on ONNX
+  Runtime Web (WebGPU, or WebAssembly), each part transcribed onto its own channel, and
+  parts to listen to, leave out or download. The weights download from the author's
+  Hugging Face page on first use; their license was removed on 31 August 2026, a known
+  risk the owner accepted. Revisit if the author states terms.
 - **Next:**
-  1. **Split into parts** in Convert: separate vocals, drums, bass and the rest with
-     Demucs (htdemucs) in the browser (ONNX Runtime Web on WebGPU, model downloaded on
-     first use), then transcribe each part onto its own channel and let people mute,
-     re-convert or edit one part. Check the trained weights' license first: the code
-     is MIT, but the weights were long described as research-only.
+  1. **Faster splitting without a GPU**: multi-threaded WebAssembly needs a
+     cross-origin isolated page (COOP/COEP headers, which GitHub Pages can't send; the
+     service worker could add them).
   2. **Ready-made plugin downloads**: build the Godot addon (with its libraries for
      Windows, macOS and Linux) and the Unity package in the release workflow, so game
      developers don't need Rust. Needed before the engine-store listings (6a.3).

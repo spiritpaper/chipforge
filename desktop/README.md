@@ -56,7 +56,9 @@ To develop, run the web dev server (`pnpm dev`) and in another terminal
   command in `src-tauri/src/main.rs`, which shows a Save dialog and writes the file.
 - No service worker and no Account page.
 - The window only loads the app's own files (see the content security policy in
-  `src-tauri/tauri.conf.json`).
+  `src-tauri/tauri.conf.json`). The one exception is **Split into parts** in Convert,
+  which downloads the Demucs model from Hugging Face (`huggingface.co`, `*.hf.co`) the
+  first time it's used.
 
 Icons come from `src-tauri/icons/app-icon.png`; regenerate the set with
 `pnpm --filter chipforge-desktop tauri icon src-tauri/icons/app-icon.png -o src-tauri/icons`

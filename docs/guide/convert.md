@@ -41,16 +41,59 @@ The result opens in [Compose](compose.md), where you can change anything.
 - Songs with **one clear melody** work best: chiptune, game music, piano pieces, pop with
   a strong lead.
 - Dense mixes (rock with distorted guitars, orchestras, heavy reverb) give muddier
-  results. Use the Lo-fi filter for those, or convert and then clean up in Compose.
+  results. [Split into parts](#split-into-parts) first, use the Lo-fi filter, or convert
+  and then clean up in Compose.
 - Expect to fix a few notes. The piano roll's [multi-select](compose.md#piano-roll)
   makes moving and deleting groups of notes quick.
 
-Coming next: splitting a song into vocals, drums, bass and the rest before converting,
-so each part gets its own chip channel. See the [roadmap](../PLAN.md).
+## Split into parts
+
+For full songs, tick **Split into parts first** before **Make the chip version**.
+ChipForge then separates the song into **vocals**, **drums**, **bass** and the **other
+instruments** with [Demucs](https://github.com/adefossez/demucs), and converts each part
+on its own:
+
+| Part | Becomes |
+|---|---|
+| Vocals | The melody, on Pulse 1 (when nobody sings, the top line of the other instruments) |
+| Other instruments | Harmony and chords, on Pulse 2 |
+| Bass | The Triangle |
+| Drums | The Noise channel |
+
+This works much better than guessing the parts from the whole mix: the bass stays bass
+even when it plays high, the singer's line doesn't get mixed up with the guitar's, and
+drum hits are found in the drums alone.
+
+Afterwards, the **Parts** list lets you:
+
+- **listen** to each part on its own (the play button),
+- **leave a part out** of the chip version (untick it), for example a busy guitar,
+- **download** a part as WAV or OGG, such as the vocals alone or the song without them.
+
+### What to expect
+
+- **The first time**, it downloads the Demucs model (84 MB) from its author's Hugging
+  Face page. It's checked and kept in your browser, so later splits start straight
+  away and work offline. Nothing is uploaded.
+- **Speed:** on the processor, splitting takes about twice as long as the song (a
+  3-minute song, around 6 minutes, on our test machine), then finding the notes in
+  each part takes a little longer than usual. With a graphics card the browser can use
+  (WebGPU, in recent Chrome and Edge) splitting runs on that instead and is faster. The
+  progress bar says which one it's using.
+- Songs up to 10 minutes can be split. A split song needs a few hundred MB of memory
+  while it works.
+
+### About the model's license
+
+Demucs's code is MIT-licensed, but its trained model currently has **no license**: its
+author removed the MIT license from the model page on 31 August 2026, and the model was
+once described as for research use. ChipForge doesn't include or host the model; your
+browser downloads it from the author when you ask. Keep that in mind before using split
+parts commercially. Details: [Third-party notices](../../THIRD_PARTY_NOTICES.md).
 
 ## Whose music is it?
 
-Converting a song doesn't change who owns it. A chip version of someone else's song is
-still their song (a cover), so you need permission to publish it or use it in a game,
+Converting a song doesn't change who owns it. A chip version of someone else's song,
+or a part split out of it, is still their song, so you need permission to publish it or use it in a game,
 and video sites may flag it. Convert your own music, music you have the rights to, or
 public-domain pieces. See the [FAQ](faq.md#can-i-convert-any-song-and-use-it).
