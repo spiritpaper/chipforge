@@ -1,0 +1,26 @@
+[project]
+name = "demucs-onnx"
+version = "0.1.0"
+description = "Exports the HTDemucs network as an ONNX graph whose weights stay in the author's safetensors file"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "demucs @ git+https://github.com/adefossez/demucs@2883f3db65617d6d178c6ed10d869dc14e44e59b",
+  "torch>=2.4",
+  "onnx>=1.16",
+  "onnxruntime>=1.19",
+  "safetensors>=0.4",
+  "numpy",
+  "huggingface_hub",
+]
+
+[tool.uv]
+package = false
+environments = ["sys_platform == 'linux'"]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
