@@ -107,6 +107,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.plan.outputs.tag }}
+          NOTES: |
+            Download the installer for your system below, or use ChipForge in your browser at https://spiritpaper.site/chipforge/app/ with nothing to install. Guides: https://spiritpaper.site/chipforge/
+
+            Code signing policy: https://spiritpaper.site/chipforge/docs/CODE_SIGNING.html
         run: |
           prerelease=$([[ "$TAG" == *-* ]] && echo --prerelease || true)
           # The artifacts keep the bundle folders (appimage/, deb/, msi/, ...).
@@ -116,7 +120,7 @@ jobs:
           # annotation, so they show on the run's summary page.
           if ! out=$(gh release create "$TAG" "${files[@]}" \
               --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "ChipForge $TAG" \
-              --generate-notes $prerelease 2>&1); then
+              --notes "$NOTES" --generate-notes $prerelease 2>&1); then
             echo "::error title=gh release create failed::${out//$'\n'/%0A}"
             exit 1
           fi

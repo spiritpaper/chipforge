@@ -211,8 +211,24 @@ Not done:
 ## Phase 6 — Growth: from first sound to community
 
 The goal is getting people from opening the app to a usable sound in about a minute,
-then giving them reasons to bring others in. Ordered by value for effort; the first
-three are next.
+then giving them reasons to bring others in. Ordered by value for effort.
+
+### Now (October 2026)
+- **Done:** the [website](https://spiritpaper.site/chipforge/) with user guides, and the
+  web app hosted beside it (GitHub Pages, no server); multi-select and drag in the
+  piano roll and tracker; the royalty-free promise in the docs and LICENSING.md.
+- **In progress:** signed Windows installers through SignPath Foundation (free for open
+  source; see the [Code signing policy](CODE_SIGNING.md)).
+- **Next:**
+  1. **Split into parts** in Convert: separate vocals, drums, bass and the rest with
+     Demucs (htdemucs) in the browser (ONNX Runtime Web on WebGPU, model downloaded on
+     first use), then transcribe each part onto its own channel and let people mute,
+     re-convert or edit one part. Check the trained weights' license first: the code
+     is MIT, but the weights were long described as research-only.
+  2. **Ready-made plugin downloads**: build the Godot addon (with its libraries for
+     Windows, macOS and Linux) and the Unity package in the release workflow, so game
+     developers don't need Rust. Needed before the engine-store listings (6a.3).
+  3. The rest of 6a, starting with SFX variations and packs.
 
 ### 6a — Before traction (cheap, high value)
 1. **Royalty-free, said plainly**: "Everything you make is yours: royalty-free, use
