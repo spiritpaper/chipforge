@@ -6,7 +6,8 @@ for), with adaptive controls.
 
 ## Install
 
-1. Build the extension: `./build.sh --release` (needs Rust), or download a release.
+1. Build the extension: `./build.sh --release` (needs Rust). Ready-made downloads are
+   planned.
 2. Copy `project/addons/chipforge` into your project's `addons/` folder.
 3. Export songs from ChipForge: **Compose → Export → Game engine file** (`.chipsong`).
    Drop them anywhere in your project; they load as `ChipSong` resources.
