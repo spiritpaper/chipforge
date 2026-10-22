@@ -5,6 +5,7 @@ import { EMPTY_CELL, SONG_VERSION, type Cell, type Song } from '../song/model'
 import { drumRows, monophonic, splitIntoPatterns, type DrumKind, type RowNote } from '../song/voices'
 import type { DrumHit } from './drums'
 import type { HeardNote } from './transcribe'
+import type { PartNotes } from './transcribe-worker'
 
 export type Detail = 'simple' | 'balanced' | 'detailed'
 
@@ -16,7 +17,19 @@ export interface ArrangeOptions {
   /** Play chords as fast arpeggios on the second pulse channel. */
   chords: boolean
   drums: boolean
+  /** With a split song: which parts to use (all by default). Off parts leave their channel empty. */
+  parts?: PartChoice
 }
+
+export interface PartChoice {
+  vocals: boolean
+  other: boolean
+  bass: boolean
+  drums: boolean
+}
+
+/** Fewer sung notes than this and the song counts as instrumental. */
+const MIN_SUNG_NOTES = 8
 
 const ROWS_PER_BEAT = 4
 const PATTERN_LENGTH = 64
@@ -95,32 +108,64 @@ export function cleanNotes(notes: HeardNote[]): HeardNote[] {
   return merged
 }
 
-export function arrangeChip(heard: HeardNote[], hits: DrumHit[], options: ArrangeOptions, title: string): ChipResult {
+/**
+ * Arranges heard notes for the chip. Without `parts`, voices are guessed from the mix:
+ * high notes make the melody and harmony, low ones the bass. With a split song, each
+ * channel gets its own part: melody from the vocals (or the top line of the other
+ * instruments when nobody sings), harmony from the other instruments, bass from the
+ * bass part.
+ */
+export function arrangeChip(heard: HeardNote[], hits: DrumHit[], options: ArrangeOptions, title: string, parts?: PartNotes): ChipResult {
   const rowSeconds = 60 / options.bpm / ROWS_PER_BEAT
   const limit = LIMITS[options.detail]
   const row = (t: number) => Math.round((t - options.origin) / rowSeconds)
-  const notes = cleanNotes(heard)
-  const placed: RowNote[] = notes
-    .filter((n) => n.amplitude >= limit.level)
-    .map((n) => ({ start: row(n.start), end: row(n.start + n.duration), pitch: n.pitch, level: Math.min(1, n.amplitude * 1.4) }))
-    .filter((n) => n.start >= 0 && n.end - n.start >= limit.rows)
-  const lastRow = Math.max(0, ...placed.map((n) => n.end), ...hits.map((h) => row(h.time) + 1))
+  const place = (notes: HeardNote[]): RowNote[] =>
+    cleanNotes(notes)
+      .filter((n) => n.amplitude >= limit.level)
+      .map((n) => ({ start: row(n.start), end: row(n.start + n.duration), pitch: n.pitch, level: Math.min(1, n.amplitude * 1.4) }))
+      .filter((n) => n.start >= 0 && n.end - n.start >= limit.rows)
+  const use = (parts && options.parts) || { vocals: true, other: true, bass: true, drums: true }
+  // With parts, the Drums part is the switch (the Drums option is hidden then).
+  const useDrums = parts ? use.drums : options.drums
+
+  // `high` feeds the melody, `upper` the harmony (minus the melody's notes), `low` the bass.
+  let melodic: RowNote[], high: RowNote[], upper: RowNote[], low: RowNote[], sung = false
+  if (parts) {
+    const vocals = use.vocals ? place(parts.vocals) : []
+    const other = use.other ? place(parts.other) : []
+    low = use.bass ? place(parts.bass) : []
+    sung = vocals.length >= MIN_SUNG_NOTES
+    // With a singer, the other instruments are the harmony; otherwise they're both.
+    high = sung ? vocals : other
+    upper = other
+    melodic = [...vocals, ...other, ...low]
+  } else {
+    melodic = place(heard)
+    high = upper = melodic.filter((n) => n.pitch > BASS_SPLIT)
+    low = melodic.filter((n) => n.pitch <= BASS_SPLIT)
+  }
+  const lastRow = Math.max(0, ...melodic.map((n) => n.end), ...(useDrums ? hits.map((h) => row(h.time) + 1) : []))
   const rows = Math.min(MAX_PATTERNS * PATTERN_LENGTH, Math.max(PATTERN_LENGTH, Math.ceil(lastRow / PATTERN_LENGTH) * PATTERN_LENGTH))
 
-  const high = placed.filter((n) => n.pitch > BASS_SPLIT)
-  const low = placed.filter((n) => n.pitch <= BASS_SPLIT)
   const lead = monophonic(high, rows, 'high', 0)
-  const second = harmony(high, lead, rows, options.chords)
+  const second = harmony(upper, lead, rows, options.chords)
   const bass = monophonic(low, rows, 'low', 2)
   const kit: Record<DrumKind, number> = { kick: 3, snare: 4, hat: 5, open: 5 }
-  const drums = options.drums ? drumRows(hits.map((h) => ({ row: row(h.time), kind: h.kind })), rows, kit) : Array<Cell>(rows).fill(EMPTY_CELL)
+  const drums = useDrums ? drumRows(hits.map((h) => ({ row: row(h.time), kind: h.kind })), rows, kit) : Array<Cell>(rows).fill(EMPTY_CELL)
 
   const { patterns, order } = splitIntoPatterns([lead, second, bass, drums], PATTERN_LENGTH)
   const count = (cells: Cell[]) => cells.filter((c) => c.note !== null && c.note >= 0).length
   const lines = [
-    `Tempo ${Math.round(options.bpm)} BPM; ${placed.length} of ${heard.length} heard notes kept (${options.detail} detail; overtones and repeats removed).`,
-    `Melody ${count(lead)} notes, ${options.chords ? 'chords and harmony' : 'harmony'} ${count(second)}, bass ${count(bass)}${options.drums ? `, drums ${count(drums)} hits` : ''}.`,
+    `Tempo ${Math.round(options.bpm)} BPM; ${melodic.length} of ${heard.length} heard notes kept (${options.detail} detail; overtones and repeats removed).`,
+    `Melody ${count(lead)} notes, ${options.chords ? 'chords and harmony' : 'harmony'} ${count(second)}, bass ${count(bass)}${useDrums ? `, drums ${count(drums)} hits` : ''}.`,
   ]
+  if (parts) {
+    lines.push(
+      sung
+        ? 'Split into parts: the melody comes from the vocals, the harmony from the other instruments.'
+        : 'Split into parts: no clear singing, so the melody is the top line of the other instruments.',
+    )
+  }
   if (lastRow > rows) lines.push(`The recording is longer than ${MAX_PATTERNS} patterns, so the end was cut.`)
 
   const song: Song = {

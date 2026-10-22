@@ -10,6 +10,9 @@ export default defineConfig({
   base: process.env.CHIPFORGE_BASE ?? '/',
   plugins: [svelte()],
   server: { proxy: api },
+  // ONNX Runtime loads its WebAssembly files itself; pre-bundling it would also make
+  // the dev server reload the page the first time a song is split.
+  optimizeDeps: { exclude: ['onnxruntime-web'] },
   preview: { proxy: api },
   test: {
     include: ['src/**/*.test.ts'],

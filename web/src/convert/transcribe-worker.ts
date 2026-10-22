@@ -14,11 +14,27 @@ import { stft } from './stft'
 export interface ListenRequest {
   /** Mono, at TRANSCRIBE_RATE. */
   samples: Float32Array
+  /** The song split into parts (also mono at TRANSCRIBE_RATE), when it was split. */
+  parts?: SplitParts
+}
+
+export interface SplitParts {
+  vocals: Float32Array
+  other: Float32Array
+  bass: Float32Array
+  drums: Float32Array
+}
+
+/** Notes heard in each melodic part. */
+export interface PartNotes {
+  vocals: HeardNote[]
+  other: HeardNote[]
+  bass: HeardNote[]
 }
 
 export type ListenMessage =
   | { type: 'progress'; stage: 'loading' | 'notes' | 'rhythm'; fraction: number; backend?: string }
-  | { type: 'done'; notes: HeardNote[]; rhythm: Rhythm; hits: DrumHit[]; backend: string }
+  | { type: 'done'; notes: HeardNote[]; parts?: PartNotes; rhythm: Rhythm; hits: DrumHit[]; backend: string }
   | { type: 'error'; error: string }
 
 const post = (m: ListenMessage) => postMessage(m)
@@ -37,13 +53,22 @@ self.onmessage = async (e: MessageEvent<ListenRequest>) => {
       fetch(weightsUrl).then((r) => r.arrayBuffer()),
     ])
     const model = loadModel(json, weights)
-    const { samples } = e.data
-    const heard = await transcribe(model, samples, (fraction) => post({ type: 'progress', stage: 'notes', fraction, backend }))
-    const notes = measureAttacks(heard, stft(samples, TRANSCRIBE_RATE))
+    const { samples, parts } = e.data
+    // Each melodic part is transcribed on its own; without parts, the whole mix.
+    const sources = parts ? [parts.vocals, parts.other, parts.bass] : [samples]
+    const heard: HeardNote[][] = []
+    for (const [i, source] of sources.entries()) {
+      const notes = await transcribe(model, source, (f) =>
+        post({ type: 'progress', stage: 'notes', fraction: (i + f) / sources.length, backend }),
+      )
+      heard.push(measureAttacks(notes, stft(source, TRANSCRIBE_RATE)))
+    }
     post({ type: 'progress', stage: 'rhythm', fraction: 1, backend })
     const rhythm = detectRhythm(samples, TRANSCRIBE_RATE)
-    const hits = detectDrums(samples, TRANSCRIBE_RATE)
-    post({ type: 'done', notes, rhythm, hits, backend })
+    // The drum part has the hits without the rest of the band in the way.
+    const hits = detectDrums(parts?.drums ?? samples, TRANSCRIBE_RATE)
+    const partNotes = parts ? { vocals: heard[0], other: heard[1], bass: heard[2] } : undefined
+    post({ type: 'done', notes: heard.flat(), parts: partNotes, rhythm, hits, backend })
   } catch (err) {
     post({ type: 'error', error: err instanceof Error ? err.message : String(err) })
   }

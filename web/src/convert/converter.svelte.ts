@@ -11,13 +11,17 @@ import type { EncodeRequest, EncodeResponse } from '../export/encode-worker'
 import EncodeWorker from '../export/encode-worker.ts?worker'
 import lofiWorkletUrl from './lofi-worklet.ts?worker&url'
 import type { ToLofi } from './lofi-worklet'
-import { AudioFileError, decodeFile, type DecodedAudio } from './audio-file'
+import { AudioFileError, decodeFile, decodeStereo, MAX_SPLIT_SECONDS, type DecodedAudio } from './audio-file'
 import { LOFI_PRESETS, type LofiParams } from './lofi'
 import { arrangeChip, type ArrangeOptions, type ChipResult } from './arrange'
 import type { DrumHit } from './drums'
 import { nearestBeat, type Rhythm } from './rhythm'
 import { TRANSCRIBE_RATE, type HeardNote } from './transcribe'
-import type { ListenMessage, ListenRequest } from './transcribe-worker'
+import type { ListenMessage, ListenRequest, PartNotes } from './transcribe-worker'
+import type { Backend, SeparateMessage, SeparateRequest } from './separate/worker'
+import SeparateWorker from './separate/worker.ts?worker'
+import { SOURCES, type Source } from './separate/demucs'
+import { weightsCached } from './separate/weights'
 import ListenWorker from './transcribe-worker.ts?worker'
 import RenderWorker from '../export/render-worker.ts?worker'
 import type { RenderRequest, RenderResponse } from '../export/render-worker'
@@ -27,6 +31,8 @@ import { composer } from '../composer/composer.svelte'
 
 export interface Heard {
   notes: HeardNote[]
+  /** Notes per part, when the song was split. */
+  parts?: PartNotes
   rhythm: Rhythm
   hits: DrumHit[]
   backend: string
@@ -44,6 +50,20 @@ async function resample(samples: Float32Array, from: number, to: number): Promis
 }
 
 const OVERVIEW_BARS = 600
+
+/** The parts a song splits into, in the order the panel lists them. */
+export const PART_ORDER: { id: Source; label: string; channel: string }[] = [
+  { id: 'vocals', label: 'Vocals', channel: 'melody on Pulse 1' },
+  { id: 'other', label: 'Other instruments', channel: 'harmony on Pulse 2' },
+  { id: 'bass', label: 'Bass', channel: 'Triangle' },
+  { id: 'drums', label: 'Drums', channel: 'Noise' },
+]
+
+export interface Separating {
+  stage: 'decoding' | 'download' | 'loading' | 'separating'
+  fraction: number
+  backend?: Backend
+}
 
 class Converter {
   status = $state<'empty' | 'decoding' | 'ready' | 'error'>('empty')
@@ -68,6 +88,17 @@ class Converter {
   /** Playing the chip version (through the song engine) rather than the recording. */
   chipPlaying = $state(false)
 
+  /** Split the song into parts (Demucs) before listening for notes. */
+  split = $state(readPref('convert.split') === 'on')
+  /** Whether the Demucs model is already downloaded, so splitting is instant to start. */
+  splitReady = $state(false)
+  separating = $state<Separating | null>(null)
+  /** The split song: each part as mono samples at the recording's rate. */
+  parts = $state.raw<Record<Source, Float32Array> | null>(null)
+  /** The part being listened to on its own, if any. */
+  partPlaying = $state<Source | null>(null)
+  private file: File | null = null
+
   private source: AudioBufferSourceNode | null = null
   private node: AudioWorkletNode | null = null
   private buffer: AudioBuffer | null = null
@@ -90,6 +121,7 @@ class Converter {
       const row = engine.position.order * this.result.song.patternLength + engine.position.row
       return this.options.origin + row * this.chipRowSeconds
     }
+    if (this.partPlaying && this.partCtx) return Math.min(this.seconds, this.offset + this.partCtx.currentTime - this.startedAt)
     if (!this.playing || !this.ctx) return this.offset
     return Math.min(this.seconds, this.offset + this.ctx.currentTime - this.startedAt)
   }
@@ -101,6 +133,8 @@ class Converter {
     try {
       const audio = await decodeFile(file)
       this.audio = audio
+      this.file = file
+      this.parts = null
       this.overview = peaks(audio.samples, OVERVIEW_BARS)
       this.heard = null
       this.result = null
@@ -177,7 +211,7 @@ class Converter {
 
   togglePlay() {
     if (this.mode === 'chip' && this.result) {
-      if (this.chipPlaying || this.playing) this.stopAll()
+      if (this.chipPlaying || this.playing || this.partPlaying) this.stopAll()
       else if (this.original) void this.play()
       else void this.playChip()
       return
@@ -202,6 +236,7 @@ class Converter {
     this.offset = this.position()
     this.pause()
     this.stopChip()
+    this.stopPart()
   }
 
   /** Plays the arranged chip version from a time in the recording. */
@@ -242,6 +277,13 @@ class Converter {
     const audio = this.audio
     if (!audio || this.listening) return
     this.listenError = null
+    let parts: ListenRequest['parts']
+    if (this.split) {
+      const split = this.parts ?? (await this.separate())
+      if (!split) return
+      const at = async (id: Source) => resample(split[id], audio.sampleRate, TRANSCRIBE_RATE)
+      parts = { vocals: await at('vocals'), other: await at('other'), bass: await at('bass'), drums: await at('drums') }
+    }
     this.listening = { stage: 'loading', fraction: 0 }
     const worker = new ListenWorker()
     try {
@@ -258,8 +300,9 @@ class Converter {
           else reject(new Error(m.error))
         }
         worker.onerror = () => reject(new Error('The note finder stopped unexpectedly.'))
-        const request: ListenRequest = { samples }
-        worker.postMessage(request, [samples.buffer])
+        const request: ListenRequest = { samples, parts }
+        const buffers = [samples, ...(parts ? Object.values(parts) : [])].map((a) => a.buffer)
+        worker.postMessage(request, buffers)
       })
       this.heard = heard
       this.options = { ...this.options, bpm: Math.round(heard.rhythm.bpm * 10) / 10, origin: nearestBeat(heard.rhythm) }
@@ -280,7 +323,134 @@ class Converter {
 
   private arrange() {
     if (!this.heard || !this.audio) return
-    this.result = arrangeChip(this.heard.notes, this.heard.hits, $state.snapshot(this.options), this.audio.name)
+    this.result = arrangeChip(this.heard.notes, this.heard.hits, $state.snapshot(this.options), this.audio.name, this.heard.parts)
+  }
+
+  setSplit(on: boolean) {
+    this.split = on
+    writePref('convert.split', on ? 'on' : 'off')
+    if (on) void this.checkSplitReady()
+  }
+
+  async checkSplitReady() {
+    this.splitReady = await weightsCached().catch(() => false)
+  }
+
+  /** Splits the loaded song with Demucs; returns the parts, or null on failure. */
+  private async separate(): Promise<Record<Source, Float32Array> | null> {
+    const audio = this.audio
+    const file = this.file
+    if (!audio || !file) return null
+    if (this.seconds > MAX_SPLIT_SECONDS) {
+      this.listenError = `Songs up to ${MAX_SPLIT_SECONDS / 60} minutes can be split into parts; this one is ${Math.round(this.seconds / 60)}. Turn off "Split into parts" to convert it whole.`
+      return null
+    }
+    this.separating = { stage: 'decoding', fraction: 0 }
+    const worker = new SeparateWorker()
+    try {
+      const [left, right] = await decodeStereo(file)
+      const same = left === right
+      const request: SeparateRequest = { left, right: same ? left.slice() : right }
+      const parts = await new Promise<Float32Array[]>((resolve, reject) => {
+        worker.onmessage = (e: MessageEvent<SeparateMessage>) => {
+          const m = e.data
+          if (m.type === 'progress') this.separating = { stage: m.stage, fraction: m.fraction, backend: m.backend }
+          else if (m.type === 'done') resolve(m.parts)
+          else reject(new Error(m.error))
+        }
+        worker.onerror = () => reject(new Error('The part splitter stopped unexpectedly (the device may be out of memory).'))
+        worker.postMessage(request, [request.left.buffer, request.right.buffer])
+      })
+      const split = Object.fromEntries(SOURCES.map((id, i) => [id, parts[i]])) as Record<Source, Float32Array>
+      // Only keep them if the same song is still loaded.
+      if (this.audio === audio) this.parts = split
+      this.splitReady = true
+      return split
+    } catch (err) {
+      this.listenError = `Splitting failed: ${err instanceof Error ? err.message : String(err)}`
+      return null
+    } finally {
+      worker.terminate()
+      this.separating = null
+    }
+  }
+
+  /** Listens to one part on its own (or stops it). */
+  async togglePart(id: Source) {
+    const playing = this.partPlaying
+    this.stopAll()
+    if (playing === id || !this.parts || !this.audio) return
+    const out = await engine.output()
+    if (!out) return
+    const buffer = out.ctx.createBuffer(1, this.parts[id].length, this.audio.sampleRate)
+    buffer.copyToChannel(this.parts[id] as Float32Array<ArrayBuffer>, 0)
+    const source = new AudioBufferSourceNode(out.ctx, { buffer })
+    source.connect(out.input)
+    source.onended = () => {
+      if (this.partSource === source) this.stopPart()
+    }
+    this.offset = Math.min(this.offset, Math.max(0, this.seconds - 0.05))
+    source.start(0, this.offset)
+    this.startedAt = out.ctx.currentTime
+    this.partCtx = out.ctx
+    this.partSource = source
+    this.partPlaying = id
+  }
+
+  private partSource: AudioBufferSourceNode | null = null
+  private partCtx: AudioContext | null = null
+
+  private stopPart() {
+    const s = this.partSource
+    this.partSource = null
+    this.partPlaying = null
+    s?.stop()
+  }
+
+  /** Starts over with the split setting changed: the notes have to be heard again. */
+  redo() {
+    this.stopAll()
+    this.heard = null
+    this.result = null
+    void this.listen()
+  }
+
+  /** Includes or leaves out a part of the split song, and re-arranges. */
+  usePart(id: Source, on: boolean) {
+    const parts = { vocals: true, other: true, bass: true, drums: true, ...this.options.parts, [id]: on }
+    this.setOptions({ parts })
+  }
+
+  async exportPart(id: Source) {
+    const audio = this.audio
+    const samples = this.parts?.[id]
+    if (!audio || !samples) return
+    writePref('convert.format', this.exportFormat)
+    this.exporting = true
+    const worker = new EncodeWorker()
+    try {
+      const request: EncodeRequest = {
+        samples: samples.slice(),
+        sampleRate: audio.sampleRate,
+        format: this.exportFormat,
+        title: `${audio.name} (${id})`,
+      }
+      const reply = await new Promise<EncodeResponse>((resolve) => {
+        worker.onmessage = (e: MessageEvent<EncodeResponse>) => resolve(e.data)
+        worker.onerror = () => resolve({ ok: false, error: 'The encoder stopped unexpectedly.' })
+        worker.postMessage(request, [request.samples.buffer])
+      })
+      if (!reply.ok) {
+        toast.show(`Export failed: ${reply.error}`)
+        return
+      }
+      const file = `${slugify(audio.name)}-${id}.${this.exportFormat}`
+      download(reply.bytes, file, this.exportFormat === 'wav' ? 'audio/wav' : 'audio/ogg')
+      toast.show(`Saved ${file}`)
+    } finally {
+      worker.terminate()
+      this.exporting = false
+    }
   }
 
   async openInComposer() {

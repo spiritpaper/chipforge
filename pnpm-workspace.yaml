@@ -1,7 +1,9 @@
 packages:
   - web
   - desktop
-# core-js (via TensorFlow.js) only prints a banner in its install script.
+# core-js (via TensorFlow.js) only prints a banner in its install script, and
+# protobufjs (via ONNX Runtime Web) only checks its own version.
 allowBuilds:
   core-js: false
   esbuild: true
+  protobufjs: false

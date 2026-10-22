@@ -121,6 +121,37 @@ describe('arrangeChip', () => {
     expect(detailed.song.patterns[0].channels[3][0].note).toBe(1)
   })
 
+  describe('with the song split into parts', () => {
+    const opts = { bpm: 120, origin: 0, detail: 'balanced' as const, chords: false, drums: true }
+    const all = { vocals: true, other: true, bass: true, drums: true }
+    // Eight sung notes, a guitar line, and a bass part that wanders high.
+    const vocals = Array.from({ length: 8 }, (_, i) => note(i * 4, 4, 72 + (i % 3)))
+    const parts = { vocals, other: [note(0, 8, 64), note(8, 8, 76)], bass: [note(0, 16, 62)] }
+    const channel = (song: ReturnType<typeof arrangeChip>['song'], ch: number) => segments(song.patterns[0].channels[ch]).map((s) => s.note)
+
+    it('takes the melody from the vocals, harmony from the rest, bass from the bass part', () => {
+      const { song, lines } = arrangeChip([], [], { ...opts, parts: all }, 'T', parts)
+      expect(channel(song, 0)).toEqual([72, 73, 74, 72, 73, 74, 72, 73])
+      expect(channel(song, 1)).toEqual([64, 76])
+      // In the mix it would count as melody (above G3); as the bass part it stays bass.
+      expect(channel(song, 2)).toEqual([62])
+      expect(lines.at(-1)).toMatch(/from the vocals/)
+    })
+
+    it('uses the top of the other instruments when nobody sings', () => {
+      const { song, lines } = arrangeChip([], [], { ...opts, parts: { ...all, vocals: false } }, 'T', parts)
+      expect(channel(song, 0)).toEqual([64, 76])
+      expect(lines.at(-1)).toMatch(/no clear singing/)
+    })
+
+    it('leaves out parts that are switched off', () => {
+      const hits = [{ time: 0, kind: 'kick' as const }]
+      const { song } = arrangeChip([], hits, { ...opts, parts: { ...all, bass: false, drums: false } }, 'T', parts)
+      expect(channel(song, 2)).toEqual([])
+      expect(song.patterns[0].channels[3][0].note).toBeNull()
+    })
+  })
+
   it('places notes relative to the first beat and drops pickups before it', () => {
     const notes = [note(-1, 1, 70), { ...note(0, 2, 72), start: 0.25 }]
     const { song } = arrangeChip(notes, [], { bpm: 120, origin: 0.25, detail: 'balanced', chords: false, drums: false }, 'T')

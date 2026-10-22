@@ -37,3 +37,14 @@ export async function decodeFile(file: File): Promise<DecodedAudio> {
   const channels = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c))
   return { name: file.name.replace(/\.[^.]+$/, ''), samples: toMono(channels), sampleRate: buffer.sampleRate }
 }
+
+/** Songs longer than this aren't split into parts: four parts of a long song don't fit in memory. */
+export const MAX_SPLIT_SECONDS = 10 * 60
+
+/** Decodes a file as stereo at DECODE_RATE (a mono file gives the same channel twice). */
+export async function decodeStereo(file: Blob): Promise<[Float32Array, Float32Array]> {
+  const ctx = new OfflineAudioContext(1, 1, DECODE_RATE)
+  const buffer = await ctx.decodeAudioData(await file.arrayBuffer())
+  const left = buffer.getChannelData(0)
+  return [left, buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : left]
+}
