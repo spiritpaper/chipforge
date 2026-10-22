@@ -420,6 +420,30 @@ class Composer {
     this.setCursor({ channel, column: Math.min(COLUMN_COUNT - 1, Math.max(0, column)) }, select)
   }
 
+  /**
+   * Moves the selected block (or copies it, with `copy`) by whole channels and rows,
+   * starting from `from`, the song when the drag began; a drag sharing `key` undoes
+   * as one step. The shift is kept inside the pattern.
+   */
+  moveSelection(from: Song, region: Region, channels: number, rows: number, copy: boolean, key: string) {
+    const r = normalizeRegion(region)
+    const dc = Math.min(CHANNEL_COUNT - 1 - r.toChannel, Math.max(-r.fromChannel, channels))
+    const dr = Math.min(from.patternLength - 1 - r.toRow, Math.max(-r.fromRow, rows))
+    const p = this.patternIndex
+    const clip = copyRegion(from, p, r)
+    const base = copy ? from : clearRegion(from, p, r)
+    this.commit(dc || dr || copy ? pasteClip(base, p, r.fromChannel + dc, r.fromRow + dr, clip) : from, key)
+    this.selection = {
+      fromChannel: r.fromChannel + dc,
+      toChannel: r.toChannel + dc,
+      fromRow: r.fromRow + dr,
+      toRow: r.toRow + dr,
+    }
+    // The cursor stays put: the grid centres on it, and moving it would scroll the
+    // block away from the pointer mid-drag.
+    this.anchor = null
+  }
+
   /** The selection, or just the cursor's cell. */
   private target(): Region {
     const { row, channel } = this.cursor

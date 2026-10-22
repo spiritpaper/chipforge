@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addNote, moveNote, removeNote, resizeNote } from './roll'
+import { addNote, clampShift, copyNotes, moveNote, moveNotes, pasteNotes, removeNote, removeNotes, resizeNote, resizeNotes } from './roll'
 import { parseTrack } from './build'
 import { segments } from '../lib/grid'
 
@@ -45,5 +45,41 @@ describe('piano roll edits', () => {
   it('keeps effects where they are when notes move', () => {
     const moved = moveNote(parseTrack('C4:A04 . - . .', 0), 0, 2, 60)
     expect(moved[0]).toMatchObject({ note: null, effect: 'A', param: 4 })
+  })
+})
+
+describe('editing several notes', () => {
+  it('moves a group in time and pitch, keeping gaps, lengths and volumes', () => {
+    const base = parseTrack('C4:9 . D4 . - E4 . - . .', 0)
+    const { cells, starts } = moveNotes(base, [0, 2], 3, 2)
+    expect(starts).toEqual([3, 5])
+    expect(lengths(cells)).toEqual([[3, 2, 62], [5, 2, 64]])
+    expect(cells[3].volume).toBe(9)
+  })
+
+  it('leaves unselected notes alone, except where moved notes land on them', () => {
+    const { cells } = moveNotes(track('C4 . - . . . G4 . . .'), [0], 7, 0)
+    expect(lengths(cells)).toEqual([[6, 1, 67], [7, 2, 60]])
+  })
+
+  it('keeps the shift inside the pattern and the pitch range', () => {
+    const cells = track('. C4 . D4 . . . . . .')
+    expect(clampShift(cells, [1, 3], -5, 0, 24, 96)).toEqual({ rows: -1, semitones: 0 })
+    expect(clampShift(cells, [1, 3], 20, 50, 24, 96)).toEqual({ rows: 6, semitones: 34 })
+  })
+
+  it('removes and resizes several notes', () => {
+    const cells = track('C4 . D4 . E4 . . .')
+    expect(lengths(removeNotes(cells, [0, 4]))).toEqual([[2, 2, 62]])
+    expect(lengths(resizeNotes(cells, [0, 4], -1))).toEqual([[0, 1, 60], [2, 2, 62], [4, 3, 64]])
+  })
+
+  it('copies notes and pastes them elsewhere', () => {
+    const clip = copyNotes(parseTrack('C4:5 . - D4 . - . . . . . .', 2), [0, 3])!
+    expect(clip.span).toBe(5)
+    const { cells, starts } = pasteNotes(track('. . . . . . . . . . . .'), clip, 6)
+    expect(starts).toEqual([6, 9])
+    expect(lengths(cells)).toEqual([[6, 2, 60], [9, 2, 62]])
+    expect(cells[6]).toMatchObject({ volume: 5, instrument: 2 })
   })
 })

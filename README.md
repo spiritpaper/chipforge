@@ -100,6 +100,12 @@ Compose (tracker focused):
 | Ctrl+↑/↓ (Shift for octaves) | Transpose |
 | Insert / Backspace / Delete | Insert row / delete row / clear |
 | Enter | Play from the cursor |
+| Mouse drag | Select a block; drag the selection to move it, Ctrl-drag to copy it |
+
+In the piano roll, drag a box (Select tool, or Shift-drag) or Shift-click notes to
+select several; they drag together. Arrows move the selection (Shift+↑/↓ by an
+octave, Shift+←/→ resizes), Delete removes it, Ctrl+A selects every note, and
+Ctrl+C / X / V / D copy, cut, paste at the clicked row and duplicate.
 
 Anywhere in Compose: Space plays or stops, Ctrl+Z / Ctrl+Shift+Z undo and redo,
 and ` switches between tracker and piano roll.

@@ -3,7 +3,8 @@
   import { channelsFor } from '../../audio/channels'
   import { composer } from '../../composer/composer.svelte'
   import { COLUMNS, PIANO_KEYS, trackerAction } from '../../composer/keys'
-  import { noteLabel, type Cell } from '../../song/model'
+  import { noteLabel, type Cell, type Song } from '../../song/model'
+  import type { Region } from '../../song/edit'
 
   const ROW_H = 22
   const FONT_SIZE = 14
@@ -26,8 +27,10 @@
   const pattern = $derived(composer.song.patterns[composer.patternIndex])
   const playRow = $derived(engine.position?.order === composer.orderIndex ? engine.position.row : -1)
   const followingPlayback = $derived(composer.follow && engine.playing && playRow >= 0)
+  /** While dragging with the mouse the view holds still, so rows stay under the pointer. */
+  let heldRow = $state<number | null>(null)
   /** The row drawn in the middle of the grid. */
-  const focusRow = $derived(followingPlayback ? playRow : composer.cursor.row)
+  const focusRow = $derived(followingPlayback ? playRow : (heldRow ?? composer.cursor.row))
 
   const hex = (v: number, digits: number) => v.toString(16).toUpperCase().padStart(digits, '0')
 
@@ -176,14 +179,44 @@
     return { row, channel: Math.max(0, channel), column }
   }
 
+  /** A drag that started inside the selection moves the block (Ctrl: copies it). */
+  let blockDrag: { from: Song; region: Region; row: number; channel: number; column: number; key: string; moved: boolean } | null = null
+  let blockDrags = 0
+  let overSelection = $state(false)
+
+  function inSelection(cell: { row: number; channel: number }) {
+    const s = composer.selection
+    return !!s && cell.row >= s.fromRow && cell.row <= s.toRow && cell.channel >= s.fromChannel && cell.channel <= s.toChannel
+  }
+
   function onpointerdown(e: PointerEvent) {
     surface.focus()
     surface.setPointerCapture(e.pointerId)
-    composer.setCursor(cellAt(e), e.shiftKey)
+    const cell = cellAt(e)
+    heldRow = focusRow
+    if (e.button === 0 && !e.shiftKey && composer.selection && inSelection(cell)) {
+      blockDrag = { from: composer.song, region: composer.selection, ...cell, key: `drag:block:${++blockDrags}`, moved: false }
+      return
+    }
+    composer.setCursor(cell, e.shiftKey)
   }
 
   function onpointermove(e: PointerEvent) {
-    if (e.buttons === 1 && surface.hasPointerCapture(e.pointerId)) composer.setCursor(cellAt(e), true)
+    const cell = cellAt(e)
+    if (blockDrag) {
+      const { from, region, row, channel, key } = blockDrag
+      if (!blockDrag.moved && cell.row === row && cell.channel === channel) return
+      blockDrag.moved = true
+      composer.moveSelection(from, region, cell.channel - channel, cell.row - row, e.ctrlKey || e.metaKey, key)
+    } else if (e.buttons === 1 && surface.hasPointerCapture(e.pointerId)) composer.setCursor(cell, true)
+    else overSelection = inSelection(cell)
+  }
+
+  function onpointerup() {
+    // A click inside the selection, without dragging, just moves the cursor there.
+    if (blockDrag && !blockDrag.moved) composer.setCursor(blockDrag)
+    blockDrag = null
+    heldRow = null
   }
 
   function onwheel(e: WheelEvent) {
@@ -239,11 +272,14 @@
     bind:clientWidth={width}
     bind:clientHeight={height}
     tabindex="0"
+    class:grab={overSelection}
     role="application"
     aria-roledescription="tracker"
-    aria-label="Pattern editor. Letter keys play notes, arrows move, Tab changes channel."
+    aria-label="Pattern editor. Letter keys play notes, arrows move, Tab changes channel. Drag a selection to move it, Ctrl-drag to copy it."
     {onpointerdown}
     {onpointermove}
+    {onpointerup}
+    onpointercancel={onpointerup}
     {onwheel}
     {onkeydown}
     {onkeyup}
@@ -303,6 +339,10 @@
   .body {
     cursor: text;
     touch-action: none;
+  }
+
+  .body.grab {
+    cursor: grab;
   }
 
   .body:focus-visible {

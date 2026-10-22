@@ -61,3 +61,109 @@ export function moveNote(cells: readonly Cell[], start: number, newStart: number
   put(out, target, { volume })
   return out
 }
+
+// ---- several notes at once (a selection) ----------------------------------
+
+/** Copied notes, with starts relative to the earliest one. */
+export interface NoteClip {
+  notes: { offset: number; length: number; note: number; instrument: number | null; volume: number | null }[]
+  /** Rows from the first note's start to the last note's end. */
+  span: number
+}
+
+/** Removes every note starting at one of `starts`. */
+export function removeNotes(cells: readonly Cell[], starts: Iterable<number>): Cell[] {
+  let out = cells.slice()
+  for (const start of starts) out = removeNote(out, start)
+  return out
+}
+
+/**
+ * Shifts the notes starting at `starts` by `rows` and `semitones` together, keeping
+ * their lengths, instruments and volumes. Returns the cells and the notes' new starts.
+ * The caller keeps the shift in range (see `clampShift`).
+ */
+export function moveNotes(
+  cells: readonly Cell[],
+  starts: Iterable<number>,
+  rows: number,
+  semitones: number,
+): { cells: Cell[]; starts: number[] } {
+  const wanted = new Set(starts)
+  const moving = segments(cells).filter((s) => wanted.has(s.start))
+  const volumes = moving.map((s) => cells[s.start].volume)
+  const out = removeNotes(cells, wanted)
+  const placed: number[] = []
+  moving.forEach((seg, i) => {
+    const start = seg.start + rows
+    if (start < 0 || start >= out.length) return
+    const next = addNote(out, start, Math.min(seg.length, out.length - start), seg.note + semitones, seg.instrument)
+    put(next, start, { volume: volumes[i] })
+    out.splice(0, out.length, ...next)
+    placed.push(start)
+  })
+  return { cells: out, starts: placed }
+}
+
+/** Limits a group shift so every note stays inside the pattern and the pitch range. */
+export function clampShift(
+  cells: readonly Cell[],
+  starts: Iterable<number>,
+  rows: number,
+  semitones: number,
+  low: number,
+  high: number,
+): { rows: number; semitones: number } {
+  const wanted = new Set(starts)
+  const segs = segments(cells).filter((s) => wanted.has(s.start))
+  if (!segs.length) return { rows: 0, semitones: 0 }
+  const first = Math.min(...segs.map((s) => s.start))
+  const last = Math.max(...segs.map((s) => s.start))
+  const lowest = Math.min(...segs.map((s) => s.note))
+  const highest = Math.max(...segs.map((s) => s.note))
+  return {
+    rows: Math.min(cells.length - 1 - last, Math.max(-first, rows)),
+    semitones: Math.min(high - highest, Math.max(low - lowest, semitones)),
+  }
+}
+
+/** Changes the length of several notes by `delta` rows (at least one row each). */
+export function resizeNotes(cells: readonly Cell[], starts: Iterable<number>, delta: number): Cell[] {
+  const wanted = new Set(starts)
+  let out = cells.slice()
+  for (const seg of segments(cells).filter((s) => wanted.has(s.start))) {
+    out = resizeNote(out, seg.start, Math.max(1, seg.length + delta))
+  }
+  return out
+}
+
+export function copyNotes(cells: readonly Cell[], starts: Iterable<number>): NoteClip | null {
+  const wanted = new Set(starts)
+  const segs = segments(cells).filter((s) => wanted.has(s.start))
+  if (!segs.length) return null
+  const first = segs[0].start
+  return {
+    notes: segs.map((s) => ({
+      offset: s.start - first,
+      length: s.length,
+      note: s.note,
+      instrument: s.instrument,
+      volume: cells[s.start].volume,
+    })),
+    span: Math.max(...segs.map((s) => s.start + s.length)) - first,
+  }
+}
+
+/** Pastes a clip with its first note at `row`; returns the cells and the pasted starts. */
+export function pasteNotes(cells: readonly Cell[], clip: NoteClip, row: number, top = 127): { cells: Cell[]; starts: number[] } {
+  let out = cells.slice()
+  const starts: number[] = []
+  for (const n of clip.notes) {
+    const start = row + n.offset
+    if (start < 0 || start >= out.length) continue
+    out = addNote(out, start, Math.min(n.length, out.length - start), Math.min(top, n.note), n.instrument)
+    put(out, start, { volume: n.volume })
+    starts.push(start)
+  }
+  return { cells: out, starts }
+}
