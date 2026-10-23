@@ -7,6 +7,7 @@
 //   they won't match exactly.
 
 import { CHANNEL_COUNT, NOTE_OFF, NOTE_RELEASE, type Cell, type Macro, type Song } from '../song/model'
+import { famiTempo } from '../song/import/famitracker'
 
 const NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-']
 const TRIANGLE = 2
@@ -29,10 +30,12 @@ function note(cell: Cell, channel: number): string {
   return `${NAMES[written % 12]}${octave}`
 }
 
-function row(cell: Cell, channel: number): string {
+function row(cell: Cell, channel: number, speed: number): string {
   const inst = cell.instrument === null ? '..' : hex(cell.instrument, 2)
   const vol = cell.volume === null ? '.' : hex(cell.volume, 1)
-  const fx = cell.effect === null ? '...' : `${cell.effect}${hex(cell.param, 2)}`
+  // Fxx of 20 and up sets the tempo, in FamiTracker's units.
+  const param = cell.effect === 'F' && cell.param >= 0x20 ? Math.min(0xff, Math.max(0x20, famiTempo(cell.param, speed))) : cell.param
+  const fx = cell.effect === null ? '...' : `${cell.effect}${hex(param, 2)}`
   return `${note(cell, channel)} ${inst} ${vol} ${fx}`
 }
 
@@ -58,7 +61,9 @@ export function songToFamiTracker(song: Song): string {
   })
   out.push('# Macros', ...macroLines, '', '# DPCM samples', '', '# Instruments', ...instLines, '')
 
-  const tempo = Math.min(255, Math.max(32, song.bpm))
+  // FamiTracker's rows last speed × (2.5 / tempo) seconds, ChipForge's 15 / BPM, so
+  // its tempo is BPM × speed / 6 (the same number only at speed 6).
+  const tempo = Math.min(255, Math.max(32, famiTempo(song.bpm, song.speed)))
   out.push('# Tracks', '', `TRACK ${String(song.patternLength).padStart(3)} ${String(song.speed).padStart(3)} ${String(tempo).padStart(3)} ${quote(song.title.slice(0, 31))}`)
   out.push(`COLUMNS : ${Array(CHANNEL_COUNT + 1).fill(1).join(' ')}`, '')
   song.order.forEach((p, i) => out.push(`ORDER ${hex(i, 2)} : ${[p, p, p, p, 0].map((x) => hex(x, 2)).join(' ')}`))
@@ -67,7 +72,7 @@ export function songToFamiTracker(song: Song): string {
   song.patterns.forEach((pattern, p) => {
     out.push(`PATTERN ${hex(p, 2)}`)
     for (let r = 0; r < song.patternLength; r++) {
-      const cells = pattern.channels.map((cells, ch) => row(cells[r], ch))
+      const cells = pattern.channels.map((cells, ch) => row(cells[r], ch, song.speed))
       out.push(`ROW ${hex(r, 2)} : ${[...cells, emptyDpcm].join(' : ')}`)
     }
     out.push('')
