@@ -15,6 +15,13 @@ the rights to use it in a game or a video, and video sites' copyright systems ma
 still recognise the melody. Convert your own music, music you've licensed, or
 public-domain pieces (most classical music is a good start).
 
+## Can I open sheet music or songs from other apps?
+
+Yes: **Compose → Songs → Open a song file…** opens MIDI, MusicXML (from MuseScore and
+other notation apps), ABC, FamiTracker text and MOD files. See
+[Opening songs from other apps](compose.md#opening-songs-from-other-apps). For sound
+effects from sfxr, jsfxr or rFXGen, use **Import…** in SFX Lab.
+
 ## Is anything uploaded?
 
 No. Sound effects, songs and conversions are all made on your device. Without an

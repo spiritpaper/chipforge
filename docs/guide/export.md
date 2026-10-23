@@ -7,7 +7,7 @@ Open **Compose → Export**. Every format is made on your device.
 | **WAV / OGG audio** | Videos, game engines, anything | Choose **Loop for games** (stops where the song loops back, with loop points engines read) or **Fade out for listening** (plays the loop once more and fades). 44.1 or 48 kHz. |
 | **Game engine file** (`.chipsong`) | The ChipForge plugins for Godot, Unity and C/C++ | A few KB. The game plays it live, so music can react: mute layers, change tempo, switch sections. See [Game engines](game-engines.md). |
 | **VGM** | VGM players (VGMPlay, foobar2000) and chiptune archives | The exact writes to a real NES or Game Boy sound chip. |
-| **FamiTracker text** | FamiTracker or Dn-FamiTracker (**File → Import Text**) | Notes, instruments, volumes and most effects carry over. Game Boy songs play on the NES chip there. |
+| **FamiTracker text** | FamiTracker or Dn-FamiTracker (**File → Import Text**) | Notes, instruments, volumes, tempo and most effects carry over, and the file opens in ChipForge again. Game Boy songs play on the NES chip there. |
 | **MIDI** | Other music software (DAWs) | Notes and tempo only; Noise becomes General MIDI drums. |
 | **Song file** (`.chipsong.json`) | Backups, moving songs between browsers | Open it again from **Songs**. |
 | **Share link** | Sending a song to someone | Needs an account on a ChipForge server. |

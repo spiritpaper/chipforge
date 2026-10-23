@@ -22,7 +22,8 @@ for your games.
   time; the Game Boy's wave channel has eight waveforms): a tracker and a piano
   roll on the same patterns, instruments with drawable volume/tone/bend/chord
   macros, a song-order strip, undo, autosave, starter templates, MIDI keyboard
-  input, MIDI import/export, and WAV/OGG export with loop points for game engines.
+  input, MIDI export, opening songs from MIDI, MusicXML, ABC, FamiTracker text and
+  MOD files, and WAV/OGG export with loop points for game engines.
 - **Convert** turns any recording into 8-bit: the **Lo-fi Filter** crunches it live,
   and **Chip version** transcribes its notes, beat and drums (Basic Pitch on your GPU
   via WebGL) and rebuilds it as an editable chip song. Nothing is uploaded.

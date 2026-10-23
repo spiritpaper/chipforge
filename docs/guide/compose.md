@@ -117,9 +117,31 @@ two digits.
 - **Mute / Solo** on the channel strips at the bottom.
 - **Connect MIDI keyboard** plays and records from a USB keyboard, in browsers with Web
   MIDI (Chrome, Edge, Firefox; not Safari).
-- **Songs → Open a MIDI or song file…** imports a MIDI file; ChipForge picks the four
-  parts to fit the four channels (drums go to Noise) and reports what it changed.
+- **Songs → Open a song file…** opens music written down elsewhere, as a new song you
+  can play and edit. See [Opening songs from other apps](#opening-songs-from-other-apps).
 - Undo and redo: **Ctrl+Z** and **Ctrl+Shift+Z**. Songs save automatically.
 - **`** (backquote) switches between tracker and piano roll.
+
+## Opening songs from other apps
+
+**Songs → Open a song file…** reads these, telling them apart by their contents:
+
+| Format | From | What comes over |
+|---|---|---|
+| **FamiTracker text** (`.txt`) | FamiTracker, Dn-FamiTracker, 0CC (File → Export Text) | Everything for the four 2A03 channels: notes, instruments with their macros, volumes, effects, tempo. The DPCM channel and expansion chips are left out. |
+| **MIDI** (`.mid`) | DAWs, notation apps, the web | Notes and tempo |
+| **MusicXML** (`.musicxml`, `.mxl`) | MuseScore, Sibelius, Finale, Dorico, sheet-music sites | Notes, chords, ties, every part and voice, drums, transposing instruments, repeats with 1st and 2nd endings, tempo |
+| **ABC** (`.abc`) | thesession.org, abcnotation.com, folk and game tune collections | Notes, keys and modes, accidentals, chords, ties, triplets, repeats, voices, tempo |
+| **MOD** (`.mod`) | ProTracker and Amiga trackers, modarchive.org | Notes and tempo of every channel; samples with drum names (BD, snare, hat…) become drums |
+| **ChipForge song** (`.chipsong.json`) | ChipForge's own Export | The whole song |
+
+Except for FamiTracker and ChipForge files, a song with more parts than the chip has
+channels is arranged the way MIDI files are: the three busiest parts become melody,
+harmony and bass (highest to lowest), drums go to Noise, and chords become one note per
+channel. A report says what went where. A single melody line (a folk tune) stays the
+melody, with the other channels left free for you.
+
+A song you open is still its writer's: see
+[Can I convert any song and use it?](faq.md#can-i-convert-any-song-and-use-it)
 
 When it sounds right, [export it](export.md).
