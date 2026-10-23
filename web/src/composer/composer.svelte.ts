@@ -21,6 +21,8 @@ import {
 } from '../song/edit'
 import { CHANNEL_COUNT, LIMITS, NOTE_OFF, NOTE_RELEASE, emptySong, type Cell, type ChipKind, type Song } from '../song/model'
 import { firstLight } from '../song/templates'
+import type { SongKey } from '../song/scales'
+import { addBeat, type BeatName } from '../song/beats'
 import { COLUMNS, COLUMN_COUNT, type Column, type TrackerAction } from './keys'
 import { addInstrument, deleteInstrument, updateInstrument, type MacroKind } from '../song/instrument-edit'
 import type { Instrument, Macro } from '../song/model'
@@ -260,6 +262,17 @@ class Composer {
 
   setPatternLength(length: number) {
     this.commit(resizePatterns(this.song, length))
+  }
+
+  /** Fills the noise channel with a beat, in this part or in every part. */
+  addBeat(beat: BeatName, everyPart: boolean) {
+    this.commit(addBeat(this.song, beat, everyPart ? [...new Set(this.song.order)] : [this.patternIndex]))
+  }
+
+  /** Sets (or with null, clears) the song's key, which the piano roll helps with. */
+  setKey(key: SongKey | null) {
+    const { key: _, ...rest } = this.song
+    this.commit(key ? { ...rest, key } : rest)
   }
 
   setView(view: 'tracker' | 'roll') {

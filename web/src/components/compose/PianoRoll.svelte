@@ -6,6 +6,9 @@
   import { segments, type Segment } from '../../lib/grid'
   import { addNote, clampShift, copyNotes, moveNotes, pasteNotes, removeNotes, resizeNotes, type NoteClip } from '../../song/roll'
   import { noteName, type Cell } from '../../song/model'
+  import { ROOT_NAMES, SCALES, detectKey, inScale, isScaleName, keyLabel, snapToScale } from '../../song/scales'
+  import { readPref, writePref } from '../../lib/prefs'
+  import { toast } from '../../lib/toast.svelte'
 
   const KEYS_W = 52
   const NOISE = 3
@@ -18,6 +21,25 @@
   let viewWidth = $state(0)
   let tool = $state<'draw' | 'select' | 'erase'>('draw')
   let defaultLength = 2
+
+  // ---- key and scale -----------------------------------------------------
+
+  const key = $derived(composer.song.key ?? null)
+  let snap = $state(readPref('compose.snap') === 'on')
+  /** Pitched notes in the key, when one is set and snapping is on. */
+  const tune = (pitch: number) => (snap && key && !isNoise ? snapToScale(pitch, key) : pitch)
+
+  function setSnap(on: boolean) {
+    snap = on
+    writePref('compose.snap', on ? 'on' : 'off')
+  }
+
+  function findKey() {
+    const found = detectKey(composer.song)
+    if (!found) return toast.show('Write a few more notes first: there is not enough to tell the key.')
+    composer.setKey(found)
+    toast.show(`This song sounds like ${keyLabel(found)}.`)
+  }
 
   const channel = $derived(composer.cursor.channel)
   const isNoise = $derived(channel === NOISE)
@@ -124,7 +146,7 @@
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
     if (!hit) scroller.focus({ preventScroll: true })
     composer.setCursor({ row })
-    const key = `drag:roll:${++dragCount}`
+    const dragKey = `drag:roll:${++dragCount}`
     const additive = e.shiftKey || e.ctrlKey || e.metaKey
     const snapshot = editable(cells)
 
@@ -139,23 +161,24 @@
       const group = selected.has(hit.start) ? selectedStarts() : [hit.start]
       if (!selected.has(hit.start)) selected = new Set([hit.start])
       if (x > (hit.start + hit.length) * cellW - EDGE_PX) {
-        drag = { mode: { kind: 'resize', starts: group, end: hit.start + hit.length - 1 }, snapshot, key }
+        drag = { mode: { kind: 'resize', starts: group, end: hit.start + hit.length - 1 }, snapshot, key: dragKey }
       } else {
         const lead = lane(hit.note)
-        drag = { mode: { kind: 'move', starts: group, row, pitch, lead, shift: 0, clicked: hit.start, moved: false }, snapshot, key }
+        drag = { mode: { kind: 'move', starts: group, row, pitch, lead, shift: 0, clicked: hit.start, moved: false }, snapshot, key: dragKey }
       }
       preview(hit.note)
       return
     }
     if (tool === 'select' || additive) {
-      drag = { mode: { kind: 'box', x0: x, y0: yPx, x1: x, y1: yPx, base: additive ? new Set(selected) : new Set() }, snapshot, key }
+      drag = { mode: { kind: 'box', x0: x, y0: yPx, x1: x, y1: yPx, base: additive ? new Set(selected) : new Set() }, snapshot, key: dragKey }
       if (!additive) selected = new Set()
       return
     }
     selected = new Set()
-    drag = { mode: { kind: 'draw', start: row, note: pitch }, snapshot, key }
-    composer.editChannel(channel, addNote(cells, row, defaultLength, pitch, composer.instrument), key)
-    preview(pitch)
+    const note = tune(pitch)
+    drag = { mode: { kind: 'draw', start: row, note }, snapshot, key: dragKey }
+    composer.editChannel(channel, addNote(cells, row, defaultLength, note, composer.instrument), dragKey)
+    preview(note)
   }
 
   function onpointermove(e: PointerEvent) {
@@ -168,7 +191,7 @@
     } else if (mode.kind === 'resize') {
       composer.editChannel(channel, resizeNotes(snapshot, mode.starts, row - mode.end), key)
     } else if (mode.kind === 'move') {
-      const shift = clampShift(snapshot, mode.starts, row - mode.row, pitch - mode.pitch, low, high)
+      const shift = clampShift(snapshot, mode.starts, row - mode.row, tune(mode.lead + pitch - mode.pitch) - mode.lead, low, high)
       if (!shift.rows && !shift.semitones && !mode.moved) return
       mode.moved = true
       if (shift.semitones !== mode.shift) {
@@ -250,7 +273,15 @@
         edit(resizeNotes(cells, starts, sign))
       } else {
         const snapshot = editable(cells)
-        const want = vertical ? { rows: 0, semitones: sign * (e.shiftKey && !isNoise ? 12 : 1) } : { rows: sign, semitones: 0 }
+        let semitones = sign * (e.shiftKey && !isNoise ? 12 : 1)
+        // Snapping a single note: step to the next note of the key.
+        const only = starts.length === 1 ? segments(snapshot).find((n) => n.start === starts[0]) : undefined
+        if (vertical && !e.shiftKey && snap && key && !isNoise && only) {
+          let next = only.note + sign
+          while (!inScale(next, key) && Math.abs(next - only.note) < 12) next += sign
+          semitones = next - only.note
+        }
+        const want = vertical ? { rows: 0, semitones } : { rows: sign, semitones: 0 }
         const shift = clampShift(snapshot, starts, want.rows, want.semitones, 0, top)
         if (!shift.rows && !shift.semitones) {
           e.preventDefault()
@@ -294,6 +325,37 @@
       <button role="radio" aria-checked={tool === 'select'} onclick={() => (tool = 'select')}>Select</button>
       <button role="radio" aria-checked={tool === 'erase'} onclick={() => (tool = 'erase')}>Erase</button>
     </div>
+    {#if !isNoise}
+      <div class="keybox" role="group" aria-label="Key">
+        <label>
+          Key
+          <select
+            aria-label="Key"
+            value={key?.root ?? ''}
+            onchange={(e) => {
+              const v = e.currentTarget.value
+              composer.setKey(v === '' ? null : { root: Number(v), scale: key?.scale ?? 'major' })
+            }}
+          >
+            <option value="">None</option>
+            {#each ROOT_NAMES as name, i (name)}<option value={i}>{name}</option>{/each}
+          </select>
+        </label>
+        {#if key}
+          <select
+            aria-label="Scale"
+            value={key.scale}
+            onchange={(e) => isScaleName(e.currentTarget.value) && composer.setKey({ ...key, scale: e.currentTarget.value })}
+          >
+            {#each Object.entries(SCALES) as [id, s] (id)}<option value={id}>{s.label}</option>{/each}
+          </select>
+          <label title="New and moved notes land on notes of the key">
+            <input type="checkbox" checked={snap} onchange={(e) => setSnap(e.currentTarget.checked)} /> Snap to key
+          </label>
+        {/if}
+        <button class="small" onclick={findKey} title="Work out the key from the notes you've written">Find key</button>
+      </div>
+    {/if}
     <p class="hint">
       Drag to draw, drag a note to move it, drag its end to resize, right-click to erase. Select several by
       dragging a box (Select tool, or Shift-drag) or Shift-clicking; they move together. Arrows move,
@@ -328,7 +390,16 @@
         oncontextmenu={(e) => e.preventDefault()}
       >
         {#each pitches as p, i (p)}
-          <rect class="lane" class:black={!isNoise && isBlack(p)} class:octave={!isNoise && p % 12 === 0} y={i * rowH} width={length * cellW} height={rowH} />
+          <rect
+            class="lane"
+            class:black={!isNoise && isBlack(p)}
+            class:octave={!isNoise && p % 12 === 0}
+            class:out={!isNoise && key && !inScale(p, key)}
+            class:root={!isNoise && key && (p - key.root) % 12 === 0}
+            y={i * rowH}
+            width={length * cellW}
+            height={rowH}
+          />
         {/each}
         {#each { length: Math.ceil(length / beat) } as _, b (b)}
           <rect class={b % 4 === 0 ? 'bar' : 'beat'} x={b * beat * cellW} y="0" width="1" height={pitches.length * rowH} />
@@ -480,6 +551,32 @@
 
   .lane.black {
     fill: #18162f;
+  }
+
+  /* With a key: notes outside it are dimmed, the key's home note is marked. */
+  .lane.out {
+    fill: #0f0d22;
+  }
+
+  .lane.root {
+    fill: #231f45;
+  }
+
+  .keybox {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 2);
+    color: var(--muted);
+    font-size: var(--step--1);
+  }
+
+  .keybox select {
+    padding: 2px var(--u);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: var(--ink);
+    color: var(--text);
+    font: inherit;
   }
 
   .lane.octave {

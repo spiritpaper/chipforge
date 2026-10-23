@@ -1,6 +1,7 @@
 // Checks songs read from storage or files, so a corrupt save can't crash the editor.
 
 import { CHANNEL_COUNT, EFFECTS, EMPTY_CELL, LIMITS, SONG_VERSION, type Cell, type Instrument, type Macro, type Song } from './model'
+import { isScaleName, type SongKey } from './scales'
 
 const isInt = (v: unknown, lo: number, hi: number): v is number => Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi
 const optInt = (v: unknown, lo: number, hi: number) => (v === null ? null : isInt(v, lo, hi) ? v : undefined)
@@ -36,6 +37,12 @@ function cellOf(x: unknown): Cell | null {
   if (!isInt(param, 0, 255)) return null
   if (note === null && instrument === null && volume === null && effect === null) return EMPTY_CELL
   return { note, instrument, volume, effect: effect as string | null, param }
+}
+
+/** A song's key, or undefined if it has none (or a damaged one, which is just dropped). */
+function keyOf(x: unknown): SongKey | undefined {
+  const k = x as { root?: unknown; scale?: unknown } | null
+  return k && isInt(k.root, 0, 11) && isScaleName(k.scale) ? { root: k.root, scale: k.scale } : undefined
 }
 
 /** A valid Song built from untrusted data, or null. */
@@ -76,5 +83,6 @@ export function validateSong(x: unknown): Song | null {
     patterns,
     order: s.order as number[],
     loopPoint: s.loopPoint,
+    ...(keyOf(s.key) ? { key: keyOf(s.key)! } : {}),
   }
 }

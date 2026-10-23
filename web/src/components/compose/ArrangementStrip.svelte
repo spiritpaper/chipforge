@@ -13,6 +13,8 @@
     setLoopPoint,
   } from '../../song/arrange'
   import { LIMITS } from '../../song/model'
+  import { BEATS, type BeatName } from '../../song/beats'
+  import { readPref, writePref } from '../../lib/prefs'
 
   const hex = (i: number) => i.toString(16).toUpperCase().padStart(2, '0')
   const song = $derived(composer.song)
@@ -30,6 +32,8 @@
   const progress = $derived(engine.position ? engine.position.row / song.patternLength : 0)
 
   let dragFrom: number | null = null
+  let beat = $state<BeatName>((readPref('compose.beat') as BeatName) in BEATS ? (readPref('compose.beat') as BeatName) : 'rock')
+  $effect(() => writePref('compose.beat', beat))
 
   function ondrop(e: DragEvent, to: number) {
     e.preventDefault()
@@ -98,6 +102,15 @@
     </label>
     <button class="key" onclick={() => composer.arrange(setLoopPoint(song, at))} disabled={song.loopPoint === at}>Loop from here</button>
     <button class="key" onclick={() => composer.arrange(removeEntry(song, at), Math.min(at, song.order.length - 2))} disabled={song.order.length <= 1}>Remove</button>
+    <span class="sep"></span>
+    <label class="field" title="Fill the drums (noise channel) with a ready-made beat">
+      Beat
+      <select bind:value={beat}>
+        {#each Object.entries(BEATS) as [id, b] (id)}<option value={id}>{b.label}</option>{/each}
+      </select>
+    </label>
+    <button class="key" onclick={() => composer.addBeat(beat, false)} title="Replace this part's drums with the beat">This part</button>
+    <button class="key" onclick={() => composer.addBeat(beat, true)} title="Replace the drums in every part with the beat">Every part</button>
   </div>
 </section>
 

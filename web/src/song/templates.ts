@@ -165,6 +165,111 @@ export interface Template {
   create: () => Song
 }
 
+/** "Title Screen": a heroic four-bar loop in D major (D – G – A – D). */
+export function titleScreen(): Song {
+  const beat = 'k . h . s . h . k . h . s . h .'
+  return song('Title Screen', 132, 64, [I.lead, I.softLead, I.bass, ...KIT], [
+    {
+      lead: `D5 . . . A4 . D5 . F#5 . . . E5 . D5 .
+             B4 . . . D5 . G5 . B5 . . . A5 . G5 .
+             A5 . . . E5 . C#5 . E5 . . . A5 . G5 .
+             F#5 . . . . . . . D5 . . . = . . .`,
+      harmony: `D4 . F#4 . A4 . F#4 . D4 . F#4 . A4 . F#4 .
+                B3 . D4 . G4 . D4 . B3 . D4 . G4 . D4 .
+                C#4 . E4 . A4 . E4 . C#4 . E4 . A4 . E4 .
+                D4 . F#4 . A4 . F#4 . D4 . F#4 . A4 . F#4 .`,
+      bass: `D2 . . . D3 . . . D2 . . . A2 . . .
+             G2 . . . G3 . . . G2 . . . D3 . . .
+             A2 . . . A3 . . . A2 . . . E3 . . .
+             D2 . . . D3 . . . D2 . A2 . D3 . . .`,
+      drums: `${beat} ${beat} ${beat} k . h . s . h . k k s . s s s s`,
+    },
+  ], [0])
+}
+
+/** "Town": cozy and unhurried, F major, two patterns. */
+export function town(): Song {
+  const beat = 'k . . . h . . . s . . . h . . .'
+  return song('Town', 112, 64, [I.softLead, I.pluck, I.bass, ...KIT], [
+    {
+      lead: `C5 . . . A4 . . . F4 . A4 . C5 . . .
+             D5 . . . . . C5 . A4 . . . F4 . . .
+             D5 . . . F5 . . . D5 . . . Bb4 . . .
+             C5 . . . E5 . . . G5 . . . = . . .`,
+      harmony: `. . A3 . . . C4 . . . A3 . . . C4 .
+                . . F3 . . . A3 . . . F3 . . . A3 .
+                . . D4 . . . F4 . . . D4 . . . F4 .
+                . . E4 . . . G4 . . . E4 . . . G4 .`,
+      bass: `F2 . . . . . . . C3 . . . . . . .
+             D2 . . . . . . . A2 . . . . . . .
+             Bb1 . . . . . . . F2 . . . . . . .
+             C2 . . . . . . . G2 . . . E2 . . .`,
+      drums: `${beat} ${beat} ${beat} ${beat}`,
+    },
+    {
+      lead: `A4 . . . C5 . . . F5 . . . E5 . D5 .
+             C5 . . . . . . . E5 . . . C5 . . .
+             Bb4 . . . D5 . . . F5 . . . D5 . . .
+             C5 . . . . . . . F4 . . . = . . .`,
+      harmony: `. . A3 . . . C4 . . . A3 . . . C4 .
+                . . C4 . . . E4 . . . C4 . . . E4 .
+                . . D4 . . . F4 . . . D4 . . . F4 .
+                . . E4 . . . G4 . . . F4 . . . A3 .`,
+      bass: `F2 . . . . . . . C3 . . . . . . .
+             A1 . . . . . . . E2 . . . . . . .
+             Bb1 . . . . . . . F2 . . . . . . .
+             C2 . . . . . . . G2 . . . F2 . . .`,
+      drums: `${beat} ${beat} ${beat} k . . . h . . . s . s . s . . .`,
+    },
+  ], [0, 1])
+}
+
+/** "Menu": a calm loop to sit on, G major (G – Em – C – D). */
+export function menu(): Song {
+  const tick = 'h . . . . . . . h . . . . . . .'
+  return song('Menu', 100, 64, [I.softLead, I.echo, I.bass, ...KIT], [
+    {
+      lead: `B4 . . . . . . . D5 . . . . . . .
+             G5 . . . . . . . E5 . . . . . . .
+             E5 . . . . . . . D5 . . . C5 . . .
+             D5 . . . . . . . . . . . = . . .`,
+      harmony: `G3 B3 D4 B3 G3 B3 D4 B3 G3 B3 D4 B3 G3 B3 D4 B3
+                E3 G3 B3 G3 E3 G3 B3 G3 E3 G3 B3 G3 E3 G3 B3 G3
+                C4 E4 G4 E4 C4 E4 G4 E4 C4 E4 G4 E4 C4 E4 G4 E4
+                D4 F#4 A4 F#4 D4 F#4 A4 F#4 D4 F#4 A4 F#4 D4 F#4 A4 F#4`,
+      bass: `G2 . . . . . . . . . . . D3 . . .
+             E2 . . . . . . . . . . . B2 . . .
+             C3 . . . . . . . . . . . G2 . . .
+             D2 . . . . . . . . . . . A2 . . .`,
+      drums: `${tick} ${tick} ${tick} ${tick}`,
+    },
+  ], [0])
+}
+
+/** "Game Over": a slow, falling jingle in C minor. */
+export function gameOver(): Song {
+  return song('Game Over', 80, 32, [I.vibratoLead, I.softLead, I.bass, ...KIT], [
+    {
+      lead: 'G4 . . . F4 . . . Eb4 . . . D4 . . . C4 . . . . . . . . . . . = . . .',
+      harmony: 'Eb4 . . . D4 . . . C4 . . . B3 . . . G3 . . . . . . . . . . . = . . .',
+      bass: 'C3 . . . . . . . Ab2 . . . G2 . . . C2 . . . . . . . . . . . - . . .',
+      drums: 'k . . . . . . . k . . . . . . . k . . . . . . . . . . . . . . .',
+    },
+  ], [0])
+}
+
+/** "Level Clear": a quick, bright jingle in G major. */
+export function levelClear(): Song {
+  return song('Level Clear', 150, 32, [I.lead, I.softLead, I.bass, ...KIT], [
+    {
+      lead: 'D5 . G5 . B5 . D6 . . . C6 . B5 . A5 . G5 . . . . . . . . . . . = . . .',
+      harmony: 'B4 . D5 . G5 . B5 . . . A5 . G5 . F#5 . D5 . . . . . . . . . . . = . . .',
+      bass: 'G2 . . . D3 . . . G2 . . . D2 . . . G2 . . . . . . . . . . . - . . .',
+      drums: 'k . h . s . h . k . h . s . s s k . . . . . . . . . . . . . . .',
+    },
+  ], [0])
+}
+
 export const TEMPLATES: Template[] = [
   { id: 'empty', title: 'Empty song', description: 'A blank pattern and one lead instrument.', create: () => emptySong() },
   { id: 'overworld', title: 'Overworld', description: 'Bright and walking, C major, 150 BPM. Two patterns.', create: overworld },
@@ -172,4 +277,9 @@ export const TEMPLATES: Template[] = [
   { id: 'boss', title: 'Boss', description: 'Fast and driving, E minor, 172 BPM, chords as arpeggios.', create: boss },
   { id: 'victory', title: 'Victory', description: 'A two-bar fanfare for winning a level.', create: victory },
   { id: 'first-light', title: 'First Light', description: 'A four-bar loop in A minor, 140 BPM.', create: firstLight },
+  { id: 'title-screen', title: 'Title Screen', description: 'Heroic and bright, D major, 132 BPM.', create: titleScreen },
+  { id: 'town', title: 'Town', description: 'Cozy and unhurried, F major, 112 BPM. Two patterns.', create: town },
+  { id: 'menu', title: 'Menu', description: 'A calm loop to sit on, G major, 100 BPM.', create: menu },
+  { id: 'game-over', title: 'Game Over', description: 'A slow, falling jingle in C minor.', create: gameOver },
+  { id: 'level-clear', title: 'Level Clear', description: 'A quick, bright jingle in G major.', create: levelClear },
 ]

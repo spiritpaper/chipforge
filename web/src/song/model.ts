@@ -1,3 +1,5 @@
+import type { SongKey } from './scales'
+
 // The song document. JSON-friendly and immutable: edits create new objects, which
 // makes undo a list of earlier songs. See core/src/tracker.rs for playback semantics.
 
@@ -69,6 +71,8 @@ export interface Song {
   order: number[]
   /** Order index the song returns to after the last entry. */
   loopPoint: number
+  /** The key the piano roll helps with; absent means none chosen. Not played: a hint. */
+  key?: SongKey
 }
 
 export const LIMITS = {
