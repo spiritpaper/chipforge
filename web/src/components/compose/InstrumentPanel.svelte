@@ -100,7 +100,7 @@
         {#if composer.song.instruments.length > 1}
           {#if confirmDelete}
             <span class="warn">
-              {uses ? `${uses} notes use it and will lose their instrument.` : 'Not used in this song.'}
+              {uses ? `${uses === 1 ? 'One note uses' : `${uses} notes use`} it and will lose ${uses === 1 ? 'its' : 'their'} instrument.` : 'Not used in this song.'}
               <button class="link danger" onclick={() => ((confirmDelete = false), composer.deleteInstrument())}>Delete</button>
               <button class="link" onclick={() => (confirmDelete = false)}>Keep</button>
             </span>

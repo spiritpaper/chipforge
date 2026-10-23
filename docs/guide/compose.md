@@ -17,8 +17,9 @@ at any time; notes and instruments carry over.
 
 - A **pattern** is a block of rows (64 by default) with a column per channel.
 - The **song order** strip lists which pattern plays when. Drag blocks to reorder them.
-  Press **Arrange** next to it for the part buttons: **Repeat** plays the same pattern again (editing one changes both), **Duplicate**
-  makes a copy you can change separately.
+  Press **Arrange** next to it for the part buttons: **New pattern**, **Repeat** (plays
+  the same pattern again; editing one changes both) and **Duplicate** (a copy you can
+  change separately).
 - The song plays to the end of the order, then loops back to the **Loop** mark (set it
   with **Loop from here**). Game music loops forever; that mark is where it comes back to.
 - **Tempo** (BPM) and **Speed** (ticks per row) set how fast rows go. Each row is 1/4

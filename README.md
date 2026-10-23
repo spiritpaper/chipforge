@@ -27,7 +27,9 @@ for your games.
   export with loop points for game engines, fit-to-length for videos, and stems.
 - **Convert** turns any recording into 8-bit: the **Lo-fi Filter** crunches it live,
   and **Chip version** transcribes its notes, beat and drums (Basic Pitch on your GPU
-  via WebGL) and rebuilds it as an editable chip song. Nothing is uploaded.
+  via WebGL) and rebuilds it as an editable chip song. **Split into parts** first runs
+  Demucs in the browser so vocals, bass, drums and the rest each get their own
+  channel. Nothing is uploaded.
 
 - **Accounts and sync** (optional): sign in with an emailed link to sync songs and
   sounds between devices and share songs by link. Run your own server with Docker

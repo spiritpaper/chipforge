@@ -30,14 +30,14 @@ streams, all yours to use in monetized videos. [For video creators](docs/guide/v
 
 | | |
 |---|---|
-| ![SFX Lab](images/sfx-lab.png){: .shot } | **SFX Lab.** Ten presets plus random and mutate, plain-language fine-tuning, a history of kept sounds, WAV and zip export, share links. |
-| ![Piano roll](images/compose-roll.png){: .shot } | **Compose.** A tracker and a piano roll on the same song, instruments you draw, templates, MIDI keyboard input, MIDI import and export, and four chip channels: <span class="ch-pulse1">Pulse 1</span>, <span class="ch-pulse2">Pulse 2</span>, <span class="ch-tri">Triangle</span>, <span class="ch-noise">Noise</span>. |
-| ![Convert](images/convert.png){: .shot } | **Convert.** Drop in an MP3 or WAV. The Lo-fi filter crunches the recording instantly; Chip version listens for the notes, beat and drums and rebuilds the song on the chip, ready to edit. |
+| ![SFX Lab](images/sfx-lab.png){: .shot } | **SFX Lab.** Two synths: a real NES chip, and classic sfxr that opens jsfxr, sfxr and rFXGen sounds exactly. Presets, mutate, eight variations at once, locks, plain-language fine-tuning, WAV, OGG and zip export, share links. |
+| ![Piano roll](images/compose-roll.png){: .shot } | **Compose.** A tracker and a piano roll on the same song, instruments you draw, templates, keys and scales that keep you in tune, one-click beats, MIDI keyboard input, songs opened from MIDI, MusicXML, ABC, FamiTracker and MOD, export with loop points, fit to length and stems, and four chip channels: <span class="ch-pulse1">Pulse 1</span>, <span class="ch-pulse2">Pulse 2</span>, <span class="ch-tri">Triangle</span>, <span class="ch-noise">Noise</span>. |
+| ![Convert](images/convert.png){: .shot } | **Convert.** Drop in an MP3 or WAV. The Lo-fi filter crunches the recording instantly; Chip version listens for the notes, beat and drums and rebuilds the song on the chip, ready to edit. Split into parts first, and the vocals, bass, drums and other instruments each get their own channel. |
 
 ## Open source
 
 ChipForge's code is on [GitHub](https://github.com/spiritpaper/chipforge): the chip
 emulation, the engine plugins and the C library are MIT, the app and server AGPL-3.0
 ([Licensing](LICENSING.md)). Bugs, ideas and contributions are welcome:
-[Contributing](CONTRIBUTING.md). Releases follow the
-[Code signing policy](docs/CODE_SIGNING.md).
+[Contributing](CONTRIBUTING.md). Installers are built from this source by GitHub
+Actions; see [Code signing](docs/CODE_SIGNING.md).

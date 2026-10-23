@@ -72,8 +72,8 @@ function gmKind(gm: number): DrumKind {
   return 'snare'
 }
 
-/** Whether a part often plays more than one note at a time (chords, two hands). */
-function playsChords(notes: MidiNote[]): boolean {
+/** How many notes start while another is still sounding (by more than a legato smudge). */
+function overlappingNotes(notes: MidiNote[]): number {
   const sorted = notes.slice().sort((a, b) => a.tick - b.tick)
   let overlapping = 0
   let end = -Infinity
@@ -82,7 +82,12 @@ function playsChords(notes: MidiNote[]): boolean {
     if (end - n.tick > n.duration / 4) overlapping++
     end = Math.max(end, n.tick + n.duration)
   }
-  return overlapping > sorted.length * 0.1
+  return overlapping
+}
+
+/** Whether a part often plays more than one note at a time (chords, two hands). */
+function playsChords(notes: MidiNote[]): boolean {
+  return overlappingNotes(notes) > notes.length * 0.1
 }
 
 export function midiToSong(midi: MidiFile, title: string): { song: Song; report: ImportReport } {
@@ -139,7 +144,9 @@ export function midiToSong(midi: MidiFile, title: string): { song: Song; report:
   channels[3] = drumRows(drumNotes.map((n) => ({ row: Math.round(n.tick / ticksPerRow), kind: gmKind(n.note) })), totalRows, kit)
   if (drumNotes.length) lines.push('Drums come from MIDI channel 10.')
   if (!sources.length && !drumNotes.length) lines.push('The file has no notes.')
-  lines.push('Chords were reduced to one note per channel; overlapping notes keep the highest (or lowest, for bass).')
+  if (chosen.some((src) => overlappingNotes(src.notes) > 0)) {
+    lines.push('Chords were reduced to one note per channel; overlapping notes keep the highest (or lowest, for bass).')
+  }
 
   const { patterns, order } = splitIntoPatterns(channels, PATTERN_LENGTH)
 

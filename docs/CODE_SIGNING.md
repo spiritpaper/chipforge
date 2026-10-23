@@ -1,28 +1,22 @@
-# Code signing policy
+# Code signing
 
-ChipForge's Windows installers are being set up for signing, so Windows can show who
-made them instead of warning about an unknown publisher.
+ChipForge's installers are **not code-signed yet**. Free signing programs for open-source
+projects (such as SignPath Foundation's) are for projects that already have a following,
+and ChipForge is new, so for now Windows and macOS warn that the publisher is unknown:
 
-Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by
-[SignPath Foundation](https://signpath.org/).
+- **Windows:** "Windows protected your PC". Click **More info**, then **Run anyway**.
+- **macOS:** "can't be opened". Right-click the app, choose **Open**, then **Open** again.
 
-## What is signed
+If you'd rather not, the [web app](https://spiritpaper.site/chipforge/app/) is the same
+app with nothing to install.
 
-Only the Windows installers (`.exe` and `.msi`) attached to
-[ChipForge releases](https://github.com/spiritpaper/chipforge/releases). They are built
-by GitHub Actions from this repository's source (see
-[`.github/workflows/desktop.yml`](https://github.com/spiritpaper/chipforge/blob/main/.github/workflows/desktop.yml)),
-and every signing request is approved by hand. Nothing built elsewhere is signed.
+## Where the installers come from
 
-## Team roles
-
-| Role | Who |
-|---|---|
-| Authors (may change the source without further review) | [spiritpaper](https://github.com/spiritpaper) |
-| Reviewers (review every change from anyone else, such as pull requests) | [spiritpaper](https://github.com/spiritpaper) |
-| Approvers (approve each signing request) | [spiritpaper](https://github.com/spiritpaper) |
-
-All of them use multi-factor authentication for GitHub and SignPath.
+Every installer attached to a
+[ChipForge release](https://github.com/spiritpaper/chipforge/releases) is built by GitHub
+Actions from this repository's source (see
+[`.github/workflows/desktop.yml`](https://github.com/spiritpaper/chipforge/blob/main/.github/workflows/desktop.yml)).
+Nothing is built on a personal computer. Only download installers from the releases page.
 
 ## Privacy
 
@@ -37,5 +31,5 @@ songs and sounds sync to that server, as described in [Self-hosting](../deploy/R
 
 ## Reporting a problem
 
-If you think a signed ChipForge file is malicious or was signed by mistake, report it
+If you think a ChipForge download is malicious or isn't what it should be, report it
 privately as described in [Security](../SECURITY.md).

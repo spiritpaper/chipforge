@@ -81,7 +81,7 @@ page LICENSING.md                   LICENSING.md                    "Licensing" 
 page THIRD_PARTY_NOTICES.md         THIRD_PARTY_NOTICES.md          "Third-party notices" 1 "Licensing"
 page CODE_OF_CONDUCT.md             CODE_OF_CONDUCT.md              "Code of conduct"     15
 page SECURITY.md                    SECURITY.md                     "Security"            16
-page docs/CODE_SIGNING.md           docs/CODE_SIGNING.md            "Code signing policy" 1 "Security"
+page docs/CODE_SIGNING.md           docs/CODE_SIGNING.md            "Code signing"        1 "Security"
 page docs/PLAN.md                   docs/PLAN.md                    "Roadmap"             17
 page docs/DESIGN.md                 docs/DESIGN.md                  "Design system"       18
 

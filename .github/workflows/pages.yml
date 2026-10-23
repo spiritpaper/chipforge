@@ -47,6 +47,8 @@ jobs:
       - run: pnpm --filter web build
         env:
           CHIPFORGE_BASE: /chipforge/app/
+          # Pages has no ChipForge server; /api there is the personal site's.
+          VITE_NO_SERVER: '1'
       - name: Gather the docs
         run: sh site/build.sh _site_src
       - uses: actions/configure-pages@v6

@@ -217,8 +217,10 @@ then giving them reasons to bring others in. Ordered by value for effort.
 - **Done:** the [website](https://spiritpaper.site/chipforge/) with user guides, and the
   web app hosted beside it (GitHub Pages, no server); multi-select and drag in the
   piano roll and tracker; the royalty-free promise in the docs and LICENSING.md.
-- **In progress:** signed Windows installers through SignPath Foundation (free for open
-  source; see the [Code signing policy](CODE_SIGNING.md)).
+- **Waiting:** signed installers. SignPath Foundation's free signing is for projects with
+  a following, so apply again once ChipForge has one; until then the installers are
+  unsigned (see [Code signing](CODE_SIGNING.md)). Meanwhile, winget and the Microsoft
+  Store are ways to install without the SmartScreen warning.
 - **Done:** **Split into parts** in Convert: Demucs (htdemucs) in the browser on ONNX
   Runtime Web (WebGPU, or WebAssembly), each part transcribed onto its own channel, and
   parts to listen to, leave out or download. The weights download from the author's

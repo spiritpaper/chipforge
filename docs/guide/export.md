@@ -12,7 +12,7 @@ Open **Compose → Export**. Every format is made on your device.
 | **Song file** (`.chipsong.json`) | Backups, moving songs between browsers | Open it again from **Songs**. |
 | **Share link** | Sending a song to someone | Needs an account on a ChipForge server. |
 
-Sound effects export from SFX Lab: **E** for one WAV, or **Download kept as .zip** for
+Sound effects export from SFX Lab: **E** for one WAV or OGG, or **Download kept as .zip** for
 all kept sounds plus `sfx.json` with their settings. See [Sound effects](sound-effects.md).
 
 ## WAV or OGG?

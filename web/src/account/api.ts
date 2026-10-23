@@ -1,6 +1,8 @@
 // Calls to the ChipForge server (same origin, under /api). The session lives in an
 // HttpOnly cookie the browser sends along; scripts never see it.
 
+import { isDesktop } from '../lib/desktop'
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -35,6 +37,9 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 
 /** Whether a ChipForge server answers here (a static deployment has none). */
 export async function serverAvailable(): Promise<boolean> {
+  // Builds known to have no server (the desktop app, GitHub Pages) don't ask: on Pages,
+  // /api belongs to the rest of the website.
+  if (isDesktop || import.meta.env.VITE_NO_SERVER === '1') return false
   try {
     const r = await fetch('/api/health')
     return r.ok && (await r.json()).status === 'ok'

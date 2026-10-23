@@ -68,6 +68,12 @@ describe('songs and MIDI', () => {
     expect(song.patterns[0].channels[2][0].note).toBe(48)
   })
 
+  it('mentions reduced chords only when there were some', () => {
+    const reduced = (m: MidiFile) => midiToSong(m, 'x').report.lines.some((l) => l.startsWith('Chords were reduced'))
+    expect(reduced(file([[0, 96, 48, 100], [0, 96, 64, 100], [0, 96, 67, 100]]))).toBe(true)
+    expect(reduced(file([[0, 96, 60, 100], [96, 96, 62, 100], [192, 96, 64, 100]]))).toBe(false)
+  })
+
   it('stores repeated sections once', () => {
     // The same note at the top of eight 64-row stretches (16 beats each).
     const notes: [number, number, number, number][] = []

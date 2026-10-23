@@ -26,8 +26,8 @@ effects from sfxr, jsfxr or rFXGen, use **Import…** in SFX Lab.
 
 No. Sound effects, songs and conversions are all made on your device. Without an
 account nothing leaves it. (**Split into parts** downloads the Demucs model the first
-time you use it; that's a download, nothing is sent.) With an account on a ChipForge server, your songs and
-sounds sync to that server so they reach your other devices.
+time you use it; that's a download, nothing is sent.) With an account on a ChipForge
+server, your songs and sounds sync to that server so they reach your other devices.
 
 ## Does it work offline?
 
@@ -42,8 +42,10 @@ Download kept as .zip** for sounds.
 
 ## Why does Windows say "Windows protected your PC"?
 
-The installer isn't code-signed yet. Click **More info → Run anyway**. Signed installers
-are coming. Or skip the install and use the [web app](https://spiritpaper.site/chipforge/app/).
+The installer isn't code-signed yet: free signing for open-source projects is for ones
+with a following, and ChipForge is new. Click **More info → Run anyway**, or skip the
+install and use the [web app](https://spiritpaper.site/chipforge/app/). See
+[Code signing](../CODE_SIGNING.md).
 
 ## Why does macOS say the app can't be opened?
 

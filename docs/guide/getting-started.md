@@ -26,8 +26,8 @@ around it.
 
 The installers aren't code-signed yet, so Windows SmartScreen warns about an unknown
 publisher. Click **More info**, then **Run anyway**. On macOS, right-click the app,
-choose **Open**, then **Open** again. Signed installers are on the way; until then the
-web app needs no install at all. See the [Code signing policy](../CODE_SIGNING.md).
+choose **Open**, then **Open** again. Or use the web app, which needs no install at all.
+See [Code signing](../CODE_SIGNING.md).
 
 ## Where your work is saved
 

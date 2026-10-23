@@ -47,6 +47,7 @@ function parseNote(text: string, channel: number): number | null | undefined {
 }
 
 const hexOrNull = (text: string) => (/^\.+$/.test(text) ? null : parseInt(text, 16))
+const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 export function famiTrackerToSong(text: string, fallbackTitle: string): { song: Song; report: ImportReport } {
   const lines = text.split(/\r?\n/)
@@ -219,7 +220,7 @@ export function famiTrackerToSong(text: string, fallbackTitle: string): { song: 
     loopPoint: 0,
   }
   report.unshift(
-    `Opened ${order.length} parts, ${songPatterns.length} patterns and ${song.instruments.length} instruments at ${bpm} BPM, speed ${song.speed}.`,
+    `Opened ${count(order.length, 'part')}, ${count(songPatterns.length, 'pattern')} and ${count(song.instruments.length, 'instrument')} at ${bpm} BPM, speed ${song.speed}.`,
   )
   for (const [what, count] of dropped) report.push(`Left out ${count} ${what}.`)
   if (macros.size && [...macros.keys()].some((k) => k.startsWith('2:'))) {

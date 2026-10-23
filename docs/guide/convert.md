@@ -17,8 +17,8 @@ song played through old hardware.
 | Gentle lo-fi | Crunchy but still clearly the original |
 
 Adjust **Sample rate**, **Bit depth** and the rest by ear. **B** switches between the
-original and the 8-bit version so you can compare. **Save the 8-bit version** downloads
-it as WAV or OGG.
+original and the 8-bit version so you can compare. Under **Save the 8-bit version**,
+pick WAV or OGG and press **Download**.
 
 ## Chip version: a real chip song you can edit
 
@@ -34,7 +34,8 @@ The result opens in [Compose](compose.md), where you can change anything.
 3. Pick the **Detail**: **Simple** keeps only the clearest notes, **Balanced** most of
    them, **Detailed** quiet notes too (it can get busy).
 4. Turn **Chords as arpeggios** and **Drums** on or off.
-5. **Open in Compose** to edit it, or download it as WAV or OGG.
+5. **Open in Compose** to edit it, or pick WAV or OGG and press **Download chip
+   version**.
 
 ### Getting good results
 
@@ -96,6 +97,6 @@ parts commercially. Details: [Third-party notices](../../THIRD_PARTY_NOTICES.md)
 ## Whose music is it?
 
 Converting a song doesn't change who owns it. A chip version of someone else's song,
-or a part split out of it, is still their song, so you need permission to publish it or use it in a game,
-and video sites may flag it. Convert your own music, music you have the rights to, or
+or a part split out of it, is still their song, so you need permission to publish it
+or use it in a game, and video sites may flag it. Convert your own music, music you have the rights to, or
 public-domain pieces. See the [FAQ](faq.md#can-i-convert-any-song-and-use-it).

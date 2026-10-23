@@ -110,7 +110,7 @@ jobs:
           NOTES: |
             Download the installer for your system below, or use ChipForge in your browser at https://spiritpaper.site/chipforge/app/ with nothing to install. Guides: https://spiritpaper.site/chipforge/
 
-            Code signing policy: https://spiritpaper.site/chipforge/docs/CODE_SIGNING.html
+            The installers aren't code-signed yet, so Windows and macOS warn about an unknown publisher. How to open them anyway: https://spiritpaper.site/chipforge/docs/CODE_SIGNING.html
         run: |
           prerelease=$([[ "$TAG" == *-* ]] && echo --prerelease || true)
           # The artifacts keep the bundle folders (appimage/, deb/, msi/, ...).
