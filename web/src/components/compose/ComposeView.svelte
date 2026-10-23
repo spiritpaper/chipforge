@@ -37,6 +37,8 @@
     flex-direction: column;
     min-height: 0;
     min-width: 0;
+    /* In short windows the view scrolls rather than squeezing the editor under the channel strips. */
+    overflow-y: auto;
   }
 
   .state {
@@ -56,7 +58,7 @@
     flex: 1;
     display: grid;
     grid-template-columns: minmax(0, 1fr) 300px;
-    min-height: 0;
+    min-height: 260px;
   }
 
   @media (max-width: 960px) {
@@ -73,10 +75,6 @@
   }
 
   @media (max-width: 720px) {
-    .compose {
-      overflow-y: auto;
-    }
-
     .top {
       padding: calc(var(--u) * 3) calc(var(--u) * 4);
     }

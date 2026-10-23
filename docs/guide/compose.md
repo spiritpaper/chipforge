@@ -16,8 +16,8 @@ at any time; notes and instruments carry over.
 ## How a song is built
 
 - A **pattern** is a block of rows (64 by default) with a column per channel.
-- The **song order** strip lists which pattern plays when. Drag blocks to reorder them;
-  **Repeat** plays the same pattern again (editing one changes both), **Duplicate**
+- The **song order** strip lists which pattern plays when. Drag blocks to reorder them.
+  Press **Arrange** next to it for the part buttons: **Repeat** plays the same pattern again (editing one changes both), **Duplicate**
   makes a copy you can change separately.
 - The song plays to the end of the order, then loops back to the **Loop** mark (set it
   with **Loop from here**). Game music loops forever; that mark is where it comes back to.
@@ -46,7 +46,8 @@ C-4 01 F A04
 
 The bottom letter row is a piano octave (**Z** is C, **S** is C#, **X** is D…), the top
 row is the octave above (**Q** is C), and **[ ]** change octave. **Step** sets how many
-rows the cursor moves after each note.
+rows the cursor moves after each note. On a phone, Rows, Octave and Step are under
+**Settings**.
 
 **Selecting:** Shift+arrows, or drag with the mouse. Then **drag the selection** to
 move it, or **Ctrl-drag** to copy it. **Ctrl+C / X / V** copy, cut and paste;
@@ -71,7 +72,7 @@ press again for the whole pattern.
 
 The piano roll shows one channel as bars on a keyboard: easier if you think in
 melodies rather than rows. Pick the channel at the top; the other channels show faintly
-behind it.
+behind it. The **?** button at the end of its toolbar shows these controls in short.
 
 - **Draw:** drag on empty space to draw a note as long as you drag. **Drag a note** to
   move it, **drag its right end** to resize, **right-click** to erase.
@@ -92,7 +93,7 @@ there; pentatonic scales are hard to sound wrong in.
 
 ### Drums in one click
 
-Under the song order, pick a **Beat** (rock, driving, four on the floor, half-time,
+Press **Arrange** next to the song order, pick a **Beat** (rock, driving, four on the floor, half-time,
 chiptune, breakbeat, march, shuffle, sparse) and press **This part** or **Every part**.
 It replaces that part's noise channel and adds the kick, snare and hi-hat instruments
 if the song doesn't have them. Edit the drums afterwards like any other notes.

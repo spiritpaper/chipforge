@@ -78,9 +78,9 @@
   .strip {
     display: flex;
     flex-direction: column;
-    gap: calc(var(--u) * 2);
+    gap: var(--u);
     min-width: 0;
-    padding: calc(var(--u) * 3) calc(var(--u) * 4);
+    padding: calc(var(--u) * 2) calc(var(--u) * 4);
     border-top: 3px solid var(--c);
     background: var(--panel);
   }
@@ -127,9 +127,10 @@
     color: var(--ink);
   }
 
+  /* Short, so the pattern above keeps the room. */
   canvas {
     width: 100%;
-    height: 72px;
+    height: 36px;
     color: var(--c);
     image-rendering: pixelated;
   }
@@ -152,7 +153,7 @@
     }
 
     canvas {
-      height: 48px;
+      height: 30px;
     }
   }
 

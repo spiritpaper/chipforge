@@ -7,6 +7,8 @@
   const LENGTHS = [16, 32, 48, 64, 96, 128, 192, 256]
   let songsOpen = $state(false)
   let exportOpen = $state(false)
+  // On phones the less-used settings fold away so the notes start on screen.
+  let moreOpen = $state(false)
 
   const midiLabel = $derived(
     {
@@ -40,53 +42,59 @@
     <button class="key" onclick={() => composer.redo()} disabled={!composer.canRedo} title="Redo (Ctrl+Shift+Z)">Redo</button>
   </div>
 
-  <label class="field">
-    Rows
-    <select value={composer.song.patternLength} onchange={(e) => composer.setPatternLength(Number(e.currentTarget.value))}>
-      {#each LENGTHS as n (n)}<option value={n}>{n}</option>{/each}
-    </select>
-  </label>
+  <button class="key more" aria-expanded={moreOpen} aria-controls="compose-settings" onclick={() => (moreOpen = !moreOpen)}>
+    Settings <span aria-hidden="true">{moreOpen ? '▴' : '▾'}</span>
+  </button>
 
-  <div class="field" role="group" aria-label="Octave for note entry">
-    Octave
-    <button class="key small" onclick={() => composer.setOctave(composer.octave - 1)} title="Octave down ([)" aria-label="Octave down">−</button>
-    <output class="mono">{composer.octave}</output>
-    <button class="key small" onclick={() => composer.setOctave(composer.octave + 1)} title="Octave up (])" aria-label="Octave up">+</button>
-  </div>
+  <div class="settings" class:open={moreOpen} id="compose-settings">
+    <label class="field">
+      Rows
+      <select value={composer.song.patternLength} onchange={(e) => composer.setPatternLength(Number(e.currentTarget.value))}>
+        {#each LENGTHS as n (n)}<option value={n}>{n}</option>{/each}
+      </select>
+    </label>
 
-  <label class="field" title="Rows the cursor moves after entering a note">
-    Step
-    <input
-      class="mono num"
-      type="number"
-      min="0"
-      max="16"
-      value={composer.step}
-      onchange={(e) => composer.setStep(e.currentTarget.valueAsNumber)}
-    />
-  </label>
+    <div class="field" role="group" aria-label="Octave for note entry">
+      Octave
+      <button class="key small" onclick={() => composer.setOctave(composer.octave - 1)} title="Octave down ([)" aria-label="Octave down">−</button>
+      <output class="mono">{composer.octave}</output>
+      <button class="key small" onclick={() => composer.setOctave(composer.octave + 1)} title="Octave up (])" aria-label="Octave up">+</button>
+    </div>
 
-  <label class="field check">
-    <input type="checkbox" checked={composer.follow} onchange={(e) => composer.setFollow(e.currentTarget.checked)} />
-    Follow playback
-  </label>
+    <label class="field" title="Rows the cursor moves after entering a note">
+      Step
+      <input
+        class="mono num"
+        type="number"
+        min="0"
+        max="16"
+        value={composer.step}
+        onchange={(e) => composer.setStep(e.currentTarget.valueAsNumber)}
+      />
+    </label>
 
-  <div class="field midi">
-    <button
-      class="key"
-      onclick={() => midiInput.connect()}
-      disabled={midiInput.status === 'connecting' || midiInput.status === 'on' || midiInput.status === 'unsupported'}
-      title="Play and enter notes from a MIDI keyboard"
-    >
-      {#if midiInput.status === 'on'}<span class="dot" aria-hidden="true"></span>{/if}
-      {midiLabel}
-    </button>
-    {#if midiInput.status === 'on'}
-      <label class="check" title="While this pattern plays, notes land on the playing row">
-        <input type="checkbox" bind:checked={midiInput.record} />
-        Record notes
-      </label>
-    {/if}
+    <label class="field check">
+      <input type="checkbox" checked={composer.follow} onchange={(e) => composer.setFollow(e.currentTarget.checked)} />
+      Follow playback
+    </label>
+
+    <div class="field midi">
+      <button
+        class="key"
+        onclick={() => midiInput.connect()}
+        disabled={midiInput.status === 'connecting' || midiInput.status === 'on' || midiInput.status === 'unsupported'}
+        title="Play and enter notes from a MIDI keyboard"
+      >
+        {#if midiInput.status === 'on'}<span class="dot" aria-hidden="true"></span>{/if}
+        {midiLabel}
+      </button>
+      {#if midiInput.status === 'on'}
+        <label class="check" title="While this pattern plays, notes land on the playing row">
+          <input type="checkbox" bind:checked={midiInput.record} />
+          Record notes
+        </label>
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -201,5 +209,32 @@
     width: 16px;
     height: 16px;
     accent-color: var(--text);
+  }
+
+  .settings {
+    display: contents;
+  }
+
+  .more {
+    display: none;
+  }
+
+  @media (max-width: 720px) {
+    .more {
+      display: inline-flex;
+      gap: var(--u);
+    }
+
+    .settings {
+      display: none;
+    }
+
+    .settings.open {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: inherit;
+      width: 100%;
+    }
   }
 </style>

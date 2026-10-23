@@ -16,8 +16,14 @@
   })
 
   let row: HTMLLIElement
+  // Bring the selected row into view by scrolling the list only: scrollIntoView would
+  // also scroll the page, and on phones the history sits below everything else.
   $effect(() => {
-    if (selected) row.scrollIntoView({ block: 'nearest' })
+    const list = row.parentElement
+    if (!selected || !list) return
+    const top = row.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop
+    if (top < list.scrollTop) list.scrollTop = top
+    else if (top + row.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = top + row.offsetHeight - list.clientHeight
   })
 </script>
 

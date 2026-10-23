@@ -34,6 +34,9 @@
   let dragFrom: number | null = null
   let beat = $state<BeatName>((readPref('compose.beat') as BeatName) in BEATS ? (readPref('compose.beat') as BeatName) : 'rock')
   $effect(() => writePref('compose.beat', beat))
+  // The part and beat buttons fold away so the pattern editor gets the room.
+  let tools = $state(readPref('compose.arrangeTools') === 'open')
+  $effect(() => writePref('compose.arrangeTools', tools ? 'open' : 'closed'))
 
   function ondrop(e: DragEvent, to: number) {
     e.preventDefault()
@@ -43,75 +46,79 @@
 </script>
 
 <section class="arrangement" aria-labelledby="arrangement-title">
-  <div class="head">
+  <div class="row">
     <h2 id="arrangement-title">Song order</h2>
-    <p class="hint">Each block plays one pattern. Drag blocks to reorder; the song returns to the loop mark when it ends.</p>
-  </div>
-
-  <ol class="blocks">
-    {#each song.order as pattern, i (i)}
-      <li
-        class:current={i === at}
-        class:playing={i === playingAt}
-        draggable="true"
-        ondragstart={() => (dragFrom = i)}
-        ondragover={(e) => e.preventDefault()}
-        ondrop={(e) => ondrop(e, i)}
-      >
-        {#if i === song.loopPoint}<span class="loop" title="The song loops back to here">Loop</span>{/if}
-        <button
-          onclick={() => composer.goToOrder(i)}
-          aria-current={i === at ? 'true' : undefined}
-          aria-label="Part {i + 1}: pattern {hex(pattern)}{uses[pattern] > 1 ? `, used ${uses[pattern]} times` : ''}{i === song.loopPoint ? ', loop start' : ''}"
+    <ol class="blocks">
+      {#each song.order as pattern, i (i)}
+        <li
+          class:current={i === at}
+          class:playing={i === playingAt}
+          draggable="true"
+          ondragstart={() => (dragFrom = i)}
+          ondragover={(e) => e.preventDefault()}
+          ondrop={(e) => ondrop(e, i)}
         >
-          <span class="num">{hex(pattern)}</span>
-          <svg class="preview" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true">
-            {#each previews[pattern] as starts, ch (ch)}
-              {#each starts as x, k (k)}
-                <rect x={x * 100} y={ch * 4} width="2" height="3" style:fill={CHANNELS[ch].color} />
+          {#if i === song.loopPoint}<span class="loop" title="The song loops back to here">Loop</span>{/if}
+          <button
+            onclick={() => composer.goToOrder(i)}
+            aria-current={i === at ? 'true' : undefined}
+            aria-label="Part {i + 1}: pattern {hex(pattern)}{uses[pattern] > 1 ? `, used ${uses[pattern]} times` : ''}{i === song.loopPoint ? ', loop start' : ''}"
+          >
+            <span class="num">{hex(pattern)}</span>
+            <svg class="preview" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true">
+              {#each previews[pattern] as starts, ch (ch)}
+                {#each starts as x, k (k)}
+                  <rect x={x * 100} y={ch * 4} width="2" height="3" style:fill={CHANNELS[ch].color} />
+                {/each}
               {/each}
-            {/each}
-          </svg>
-          {#if uses[pattern] > 1}<span class="shared" title="This pattern plays in {uses[pattern]} places; editing it changes all of them">×{uses[pattern]}</span>{/if}
-          {#if i === playingAt}<span class="progress" style:width="{progress * 100}%"></span>{/if}
-        </button>
-      </li>
-    {/each}
-  </ol>
-
-  <div class="actions" role="group" aria-label="Change part {at + 1}">
-    <button class="key" onclick={() => composer.arrange(addPatternAfter(song, at), at + 1)} disabled={full} title="Add an empty pattern after this one">New pattern</button>
-    <button class="key" onclick={() => composer.arrange(duplicatePatternAt(song, at), at + 1)} disabled={full} title="Copy this pattern into a new one you can change separately">Duplicate</button>
-    <button class="key" onclick={() => composer.arrange(repeatAt(song, at), at + 1)} disabled={full} title="Play this same pattern again; edits change both">Repeat</button>
-    <span class="sep"></span>
-    <button class="key" onclick={() => composer.arrange(moveEntry(song, at, at - 1), at - 1)} disabled={at === 0} aria-label="Move earlier" title="Move earlier">←</button>
-    <button class="key" onclick={() => composer.arrange(moveEntry(song, at, at + 1), at + 1)} disabled={at >= song.order.length - 1} aria-label="Move later" title="Move later">→</button>
-    <label class="field" title="Which pattern this part plays">
-      Plays
-      <select
-        value={song.order[at]}
-        onchange={(e) => composer.arrange(setEntryPattern(song, at, Number(e.currentTarget.value)))}
-      >
-        {#each song.patterns as _, p (p)}
-          <option value={p}>Pattern {hex(p)}{uses[p] === 0 ? ' (unused)' : ''}</option>
-        {/each}
-        {#if song.patterns.length < LIMITS.patterns}
-          <option value={song.patterns.length}>New empty pattern</option>
-        {/if}
-      </select>
-    </label>
-    <button class="key" onclick={() => composer.arrange(setLoopPoint(song, at))} disabled={song.loopPoint === at}>Loop from here</button>
-    <button class="key" onclick={() => composer.arrange(removeEntry(song, at), Math.min(at, song.order.length - 2))} disabled={song.order.length <= 1}>Remove</button>
-    <span class="sep"></span>
-    <label class="field" title="Fill the drums (noise channel) with a ready-made beat">
-      Beat
-      <select bind:value={beat}>
-        {#each Object.entries(BEATS) as [id, b] (id)}<option value={id}>{b.label}</option>{/each}
-      </select>
-    </label>
-    <button class="key" onclick={() => composer.addBeat(beat, false)} title="Replace this part's drums with the beat">This part</button>
-    <button class="key" onclick={() => composer.addBeat(beat, true)} title="Replace the drums in every part with the beat">Every part</button>
+            </svg>
+            {#if uses[pattern] > 1}<span class="shared" title="This pattern plays in {uses[pattern]} places; editing it changes all of them">×{uses[pattern]}</span>{/if}
+            {#if i === playingAt}<span class="progress" style:width="{progress * 100}%"></span>{/if}
+          </button>
+        </li>
+      {/each}
+    </ol>
+    <button class="key more" aria-expanded={tools} aria-controls="arrange-tools" onclick={() => (tools = !tools)} title="Add, copy and move parts, set the loop, add a beat">
+      Arrange <span class="caret" aria-hidden="true">{tools ? '▴' : '▾'}</span>
+    </button>
   </div>
+
+  {#if tools}
+    <p class="hint">Each block plays one pattern. Drag blocks to reorder; the song returns to the loop mark when it ends.</p>
+    <div class="actions" id="arrange-tools" role="group" aria-label="Change part {at + 1}">
+      <button class="key" onclick={() => composer.arrange(addPatternAfter(song, at), at + 1)} disabled={full} title="Add an empty pattern after this one">New pattern</button>
+      <button class="key" onclick={() => composer.arrange(duplicatePatternAt(song, at), at + 1)} disabled={full} title="Copy this pattern into a new one you can change separately">Duplicate</button>
+      <button class="key" onclick={() => composer.arrange(repeatAt(song, at), at + 1)} disabled={full} title="Play this same pattern again; edits change both">Repeat</button>
+      <span class="sep"></span>
+      <button class="key" onclick={() => composer.arrange(moveEntry(song, at, at - 1), at - 1)} disabled={at === 0} aria-label="Move earlier" title="Move earlier">←</button>
+      <button class="key" onclick={() => composer.arrange(moveEntry(song, at, at + 1), at + 1)} disabled={at >= song.order.length - 1} aria-label="Move later" title="Move later">→</button>
+      <label class="field" title="Which pattern this part plays">
+        Plays
+        <select
+          value={song.order[at]}
+          onchange={(e) => composer.arrange(setEntryPattern(song, at, Number(e.currentTarget.value)))}
+        >
+          {#each song.patterns as _, p (p)}
+            <option value={p}>Pattern {hex(p)}{uses[p] === 0 ? ' (unused)' : ''}</option>
+          {/each}
+          {#if song.patterns.length < LIMITS.patterns}
+            <option value={song.patterns.length}>New empty pattern</option>
+          {/if}
+        </select>
+      </label>
+      <button class="key" onclick={() => composer.arrange(setLoopPoint(song, at))} disabled={song.loopPoint === at}>Loop from here</button>
+      <button class="key" onclick={() => composer.arrange(removeEntry(song, at), Math.min(at, song.order.length - 2))} disabled={song.order.length <= 1}>Remove</button>
+      <span class="sep"></span>
+      <label class="field" title="Fill the drums (noise channel) with a ready-made beat">
+        Beat
+        <select bind:value={beat}>
+          {#each Object.entries(BEATS) as [id, b] (id)}<option value={id}>{b.label}</option>{/each}
+        </select>
+      </label>
+      <button class="key" onclick={() => composer.addBeat(beat, false)} title="Replace this part's drums with the beat">This part</button>
+      <button class="key" onclick={() => composer.addBeat(beat, true)} title="Replace the drums in every part with the beat">Every part</button>
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -121,11 +128,22 @@
     gap: calc(var(--u) * 2);
   }
 
-  .head {
+  .row {
     display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
+    align-items: center;
     gap: calc(var(--u) * 3);
+    min-width: 0;
+  }
+
+  .row h2 {
+    flex: none;
+  }
+
+  .more {
+    flex: none;
+    min-height: 28px;
+    padding: 0 calc(var(--u) * 2);
+    font-size: var(--step--1);
   }
 
   h2 {
@@ -139,6 +157,8 @@
   }
 
   .blocks {
+    flex: 1;
+    min-width: 0;
     display: flex;
     gap: calc(var(--u) * 2);
     margin: 0;

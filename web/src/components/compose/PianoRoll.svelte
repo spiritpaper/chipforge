@@ -20,6 +20,7 @@
   let scroller: HTMLDivElement
   let viewWidth = $state(0)
   let tool = $state<'draw' | 'select' | 'erase'>('draw')
+  let helpOpen = $state(false)
   let defaultLength = 2
 
   // ---- key and scale -----------------------------------------------------
@@ -356,12 +357,15 @@
         <button class="small" onclick={findKey} title="Work out the key from the notes you've written">Find key</button>
       </div>
     {/if}
-    <p class="hint">
-      Drag to draw, drag a note to move it, drag its end to resize, right-click to erase. Select several by
-      dragging a box (Select tool, or Shift-drag) or Shift-clicking; they move together. Arrows move,
-      Shift+←/→ resizes, Delete removes, Ctrl+C/X/V/D copy, cut, paste at the clicked row and duplicate.
-      {#if selected.size}<strong>{selected.size} selected</strong>{/if}
-    </p>
+    {#if selected.size}<strong class="count">{selected.size} selected</strong>{/if}
+    <button class="help-toggle" aria-expanded={helpOpen} aria-controls="roll-help" onclick={() => (helpOpen = !helpOpen)} title="How to use the piano roll">?</button>
+    {#if helpOpen}
+      <p class="hint" id="roll-help">
+        Drag to draw, drag a note to move it, drag its end to resize, right-click to erase. Select several by
+        dragging a box (Select tool, or Shift-drag) or Shift-clicking; they move together. Arrows move,
+        Shift+←/→ resizes, Delete removes, Ctrl+C/X/V/D copy, cut, paste at the clicked row and duplicate.
+      </p>
+    {/if}
   </div>
 
   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -492,8 +496,27 @@
     color: var(--text);
   }
 
+  .count {
+    font-size: var(--step--1);
+  }
+
+  .tools .help-toggle {
+    width: 28px;
+    height: 28px;
+    margin-left: auto;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    font-weight: 600;
+  }
+
+  .tools .help-toggle[aria-expanded='true'] {
+    background: var(--line);
+    color: var(--text);
+  }
+
   .hint {
-    flex: 1 1 320px;
+    flex: 1 1 100%;
     color: var(--muted);
     font-size: var(--step--1);
   }
@@ -502,7 +525,7 @@
     flex: 1;
     outline-offset: -2px;
     overflow: auto;
-    min-height: 240px;
+    min-height: 160px;
   }
 
   .canvas {
