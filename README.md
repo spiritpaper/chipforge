@@ -13,8 +13,11 @@ for your games.
 **Status:** Phase 5 is done. Open source: see [LICENSING.md](LICENSING.md) and
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- **SFX Lab** makes game sound effects: ten seeded presets plus random, mutate,
-  fine-tune sliders, a history with kept sounds, WAV and zip export, share links.
+- **SFX Lab** makes game sound effects on two synths: **Chip** (what a NES could play)
+  and **Classic**, a sample-exact port of jsfxr (saw and sine waves, resonant filter,
+  flanger). Presets, random, mutate, Variations, locks, fine-tune sliders, a history
+  with kept sounds, WAV/OGG and zip export, share links, and import from jsfxr, sfxr
+  (.sfs) and rFXGen (.rfx).
 - **Compose** writes chiptune songs on an emulated NES or Game Boy chip (switch any
   time; the Game Boy's wave channel has eight waveforms): a tracker and a piano
   roll on the same patterns, instruments with drawable volume/tone/bend/chord
@@ -85,8 +88,9 @@ SFX Lab:
 | 1–9, 0 | New sound from a preset (Coin … Door) |
 | R | New random sound |
 | M | Mutate: a close variation |
+| V | Variations: 8 close takes added to the history |
 | S | Keep / stop keeping |
-| E | Download WAV |
+| E | Download (WAV or OGG) |
 | L | Copy share link |
 | F | Show or hide fine-tune |
 | ↑ / ↓ | Move through history |

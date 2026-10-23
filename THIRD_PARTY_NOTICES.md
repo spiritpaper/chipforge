@@ -13,6 +13,7 @@ to them, not ChipForge's.
 | [Chakra Petch](https://fonts.google.com/specimen/Chakra+Petch), [JetBrains Mono](https://www.jetbrains.com/lp/mono/), [Silkscreen](https://fonts.google.com/specimen/Silkscreen) via Fontsource | SIL Open Font License 1.1 | Interface and data typefaces. |
 | [Svelte](https://svelte.dev) | MIT | UI framework. |
 | [fflate](https://github.com/101arrowz/fflate) | MIT | Zip export. |
+| [jsfxr](https://github.com/chr15m/jsfxr) by Chris McCormick and contributors, a port of [sfxr](https://www.drpetter.se/project_sfxr.html) by Tomas Pettersson | jsfxr: the Unlicense (public domain); sfxr: MIT, Copyright (c) 2007 Tomas Pettersson | The classic synth in `core/src/sfxr.rs` is a port of jsfxr's, presets and mutation included. `tools/jsfxr-parity/` downloads jsfxr to check it. |
 | [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) | MIT | Runs the Demucs network for Convert → Split into parts. Copyright Microsoft Corporation. Loaded only when a song is split. |
 | [Demucs](https://github.com/adefossez/demucs) code (the network's structure in `web/src/convert/separate/htdemucs.onnx`, and the spectrogram and segment code ported to `web/src/convert/separate/demucs.ts`) | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. `tools/demucs-onnx/` makes the graph from the original code. |
 | [idb-keyval](https://github.com/jakearchibald/idb-keyval) | Apache-2.0 | Browser storage. |
