@@ -9,5 +9,6 @@ pub mod dsp;
 pub mod ffi;
 pub mod gb;
 pub mod sfx;
+pub mod sfxr;
 pub mod tracker;
 pub mod vgm;

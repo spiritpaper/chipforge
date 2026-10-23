@@ -7,6 +7,7 @@
 
 use crate::chip::{CHANNELS, Chip, Rendered, SCOPE_LEN};
 use crate::sfx::{self, SfxParams};
+use crate::sfxr::{self, SfxrParams};
 use crate::tracker::{DecodeError, Song};
 
 #[unsafe(no_mangle)]
@@ -278,6 +279,120 @@ pub extern "C" fn sfx_preset_key(i: u32) -> *const u8 {
 #[unsafe(no_mangle)]
 pub extern "C" fn sfx_preset_key_len(i: u32) -> u32 {
     sfx::PRESETS[(i as usize).min(sfx::PRESETS.len() - 1)].len() as u32
+}
+
+/// The classic (sfxr) engine's workspace, used like [`SfxWorkspace`].
+pub struct SfxrWorkspace {
+    params: SfxrParams,
+    out: Vec<f32>,
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sfxr_new() -> *mut SfxrWorkspace {
+    Box::into_raw(Box::new(SfxrWorkspace {
+        params: SfxrParams::default(),
+        out: Vec::new(),
+    }))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sfxr_free(ws: *mut SfxrWorkspace) {
+    if !ws.is_null() {
+        drop(unsafe { Box::from_raw(ws) });
+    }
+}
+
+/// Pointer to the `sfxr::PARAM_COUNT` floats of the current parameters.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sfxr_params(ws: *mut SfxrWorkspace) -> *mut f32 {
+    unsafe { &mut *ws }.params.0.as_mut_ptr()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sfxr_generate(ws: *mut SfxrWorkspace, preset: u32, seed: u32) {
+    unsafe { &mut *ws }.params = sfxr::generate(preset as usize, seed);
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sfxr_mutate(ws: *mut SfxrWorkspace, seed: u32, amount: f32) {
+    let ws = unsafe { &mut *ws };
+    ws.params = sfxr::mutate(&ws.params.canonical(), seed, amount);
+}
+
+/// Brings imported values into range without changing the sound (see
+/// [`SfxrParams::canonical`]).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sfxr_canonical(ws: *mut SfxrWorkspace) {
+    let ws = unsafe { &mut *ws };
+    ws.params = ws.params.canonical();
+}
+
+/// Renders the current parameters; returns the sample count (see [`sfxr_samples`]).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sfxr_render(ws: *mut SfxrWorkspace, sample_rate: f32) -> u32 {
+    let ws = unsafe { &mut *ws };
+    ws.params = ws.params.canonical();
+    ws.out = sfxr::render(&ws.params, sample_rate.clamp(8000.0, 192_000.0));
+    ws.out.len() as u32
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sfxr_samples(ws: *const SfxrWorkspace) -> *const f32 {
+    unsafe { &*ws }.out.as_ptr()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sfxr_param_count() -> u32 {
+    sfxr::PARAM_COUNT as u32
+}
+
+fn sfxr_spec(i: u32) -> &'static sfx::ParamSpec {
+    &sfxr::PARAMS[(i as usize).min(sfxr::PARAM_COUNT - 1)]
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sfxr_param_min(i: u32) -> f32 {
+    sfxr_spec(i).min
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sfxr_param_max(i: u32) -> f32 {
+    sfxr_spec(i).max
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sfxr_param_default(i: u32) -> f32 {
+    sfxr_spec(i).default
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sfxr_param_integer(i: u32) -> u32 {
+    sfxr_spec(i).integer as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sfxr_param_key(i: u32) -> *const u8 {
+    sfxr_spec(i).key.as_ptr()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sfxr_param_key_len(i: u32) -> u32 {
+    sfxr_spec(i).key.len() as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sfxr_preset_count() -> u32 {
+    sfxr::PRESETS.len() as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sfxr_preset_key(i: u32) -> *const u8 {
+    sfxr::PRESETS[(i as usize).min(sfxr::PRESETS.len() - 1)].as_ptr()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sfxr_preset_key_len(i: u32) -> u32 {
+    sfxr::PRESETS[(i as usize).min(sfxr::PRESETS.len() - 1)].len() as u32
 }
 
 /// Exports an encoded song as a VGM file (see `vgm`). Read the result with
