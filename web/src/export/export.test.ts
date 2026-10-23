@@ -9,7 +9,7 @@ import { encodeSong } from '../song/encode'
 import { buildPattern, parseTrack } from '../song/build'
 import { firstLight } from '../song/templates'
 import { oggCrc, readComments, readPages } from './ogg'
-import { oggFile, shapeAudio, wavFile } from './audio'
+import { fitToLength, oggFile, shapeAudio, wavFile } from './audio'
 
 let wasm: ChipExports
 const SR = 22_050
@@ -44,6 +44,17 @@ describe('audio export', () => {
     expect(fade.loop).toBeNull()
     expect(fade.samples.length).toBe(2 * r.samples.length - r.loopStart)
     expect(fade.samples.at(-1)).toBe(0)
+  })
+
+  it('fits a song to an exact length, repeating its loop and fading out', () => {
+    const r = { samples: Float32Array.from({ length: 300 }, (_, i) => (i < 100 ? 0.5 : 1)), loopStart: 100, looped: true }
+    const out = fitToLength(r, 100, 7) // 700 samples: intro, then the loop three and a half times
+    expect(out.length).toBe(700)
+    expect(out[50]).toBe(0.5)
+    expect(out[350]).toBe(1) // the loop again, not the intro
+    expect(out[699]).toBeCloseTo(1 / 140) // faded over the last fifth
+    expect(fitToLength(r, 100, 1).length).toBe(100) // shorter than the song: cut and faded
+    expect(fitToLength({ ...r, looped: false }, 100, 7)[350]).toBe(0.5) // no loop: the whole song repeats
   })
 
   it('writes a smpl loop chunk into WAV files', () => {

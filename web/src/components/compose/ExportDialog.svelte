@@ -12,7 +12,8 @@
   import { songToFamiTracker } from '../../export/famitracker'
   import RenderWorker from '../../export/render-worker.ts?worker'
   import type { RenderRequest, RenderResponse } from '../../export/render-worker'
-  import type { AudioFormat, Ending } from '../../export/audio'
+  import { MAX_LENGTH_SECONDS, type AudioFormat, type Ending } from '../../export/audio'
+  import { stemSongs } from '../../export/stems'
   import { readPref, writePref } from '../../lib/prefs'
   import { account } from '../../account/account.svelte'
 
@@ -27,17 +28,35 @@
   const base = $derived(slugify(composer.song.title))
 
   let format = $state<AudioFormat>(readPref('export.format') === 'ogg' ? 'ogg' : 'wav')
-  let ending = $state<Ending>(readPref('export.ending') === 'fade' ? 'fade' : 'loop')
+  const savedEnding = readPref('export.ending')
+  let ending = $state<Ending>(savedEnding === 'fade' || savedEnding === 'length' ? savedEnding : 'loop')
+  /** Fit to length, as typed: "2:30" or "150". */
+  let lengthText = $state(readPref('export.length') ?? '1:00')
+  let stems = $state(readPref('export.stems') === 'on')
   let sampleRate = $state(Number(readPref('export.rate')) === 48_000 ? 48_000 : 44_100)
   let busy = $state(false)
   let result = $state<string | null>(null)
 
   const time = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
+  /** "2:30", "2:30.5" or "150" → seconds; NaN if it isn't a time. */
+  function parseLength(text: string): number {
+    const m = /^\s*(?:(\d+):)?(\d+(?:\.\d+)?)\s*$/.exec(text)
+    return m ? Number(m[1] ?? 0) * 60 + Number(m[2]) : NaN
+  }
+  const lengthSeconds = $derived(parseLength(lengthText))
+  const lengthValid = $derived(lengthSeconds >= 1 && lengthSeconds <= MAX_LENGTH_SECONDS)
+
   async function exportAudio() {
     writePref('export.format', format)
     writePref('export.ending', ending)
     writePref('export.rate', String(sampleRate))
+    writePref('export.length', lengthText)
+    writePref('export.stems', stems ? 'on' : 'off')
+    if (ending === 'length' && !lengthValid) {
+      result = `Type a length like 2:30, up to ${MAX_LENGTH_SECONDS / 60} minutes.`
+      return
+    }
     busy = true
     result = null
     const worker = new RenderWorker()
@@ -49,25 +68,30 @@
         sampleRate,
         format,
         ending,
+        seconds: lengthSeconds,
+        file: base,
+        stems: stems ? stemSongs(composer.song).map((s) => ({ name: s.name, song: encodeSong(s.song) })) : undefined,
       }
       const reply = await new Promise<RenderResponse>((resolve) => {
         worker.onmessage = (e: MessageEvent<RenderResponse>) => resolve(e.data)
         worker.onerror = () => resolve({ ok: false, error: 'The renderer stopped unexpectedly.' })
-        worker.postMessage(request, [request.song.buffer])
+        worker.postMessage(request, [request.song.buffer, ...(request.stems ?? []).map((s) => s.song.buffer)])
       })
       if (!reply.ok) {
         result = `Export failed: ${reply.error}`
         return
       }
-      const file = `${base}.${format}`
-      download(reply.bytes, file, format === 'wav' ? 'audio/wav' : 'audio/ogg')
+      const file = reply.zip ? `${base}-stems.zip` : `${base}.${format}`
+      download(reply.bytes, file, reply.zip ? 'application/zip' : format === 'wav' ? 'audio/wav' : 'audio/ogg')
       const loopNote =
         ending === 'fade'
           ? 'with a faded ending'
-          : reply.loopStartSeconds !== null
-            ? `looping from ${time(reply.loopStartSeconds)}`
-            : 'with no loop points: the song never loops back within 10 minutes'
-      result = `Saved ${file}: ${time(reply.seconds)}, ${loopNote}.`
+          : ending === 'length'
+            ? 'fitted to length, fading out at the end'
+            : reply.loopStartSeconds !== null
+              ? `looping from ${time(reply.loopStartSeconds)}`
+              : 'with no loop points: the song never loops back within 10 minutes'
+      result = `Saved ${file}: ${time(reply.seconds)}, ${loopNote}${reply.zip ? '; the full mix plus one file per channel' : ''}.`
       toast.show(`Saved ${file}`)
     } finally {
       worker.terminate()
@@ -173,6 +197,17 @@
         <input type="radio" bind:group={ending} value="fade" /> Fade out for listening
         <span class="note">Plays the looping part once more and fades out.</span>
       </label>
+      <label>
+        <input type="radio" bind:group={ending} value="length" /> Fit to length
+        <input
+          class="length"
+          aria-label="Length (minutes:seconds)"
+          bind:value={lengthText}
+          onfocus={() => (ending = 'length')}
+          aria-invalid={ending === 'length' && !lengthValid}
+        />
+        <span class="note">Exactly this long for a video: the loop repeats and fades out at the end.</span>
+      </label>
     </fieldset>
     <label class="inline">
       Sample rate
@@ -181,7 +216,16 @@
         <option value={48_000}>48 kHz</option>
       </select>
     </label>
-    <button class="key" onclick={exportAudio} disabled={busy}>{busy ? 'Rendering…' : `Download ${base}.${format}`}</button>
+    <fieldset>
+      <legend>Stems</legend>
+      <label>
+        <input type="checkbox" bind:checked={stems} /> Each channel as its own file too
+        <span class="note">A zip with the full mix and one file per channel, all the same length. Turn the melody down under a voice-over, or layer channels in your game.</span>
+      </label>
+    </fieldset>
+    <button class="key" onclick={exportAudio} disabled={busy}>
+      {busy ? 'Rendering…' : stems ? `Download ${base}-stems.zip` : `Download ${base}.${format}`}
+    </button>
     {#if result}<p class="result" role="status">{result}</p>{/if}
   </section>
 
@@ -229,6 +273,21 @@
 </dialog>
 
 <style>
+  .length {
+    width: 6ch;
+    margin: 0 var(--u);
+    padding: 0 var(--u);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: var(--panel);
+    color: var(--text);
+    font-family: var(--font-data);
+  }
+
+  .length[aria-invalid='true'] {
+    border-color: var(--pulse1);
+  }
+
   dialog {
     width: min(560px, calc(100vw - 32px));
     max-height: calc(100vh - 32px);

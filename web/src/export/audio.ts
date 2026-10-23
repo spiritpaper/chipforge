@@ -9,7 +9,8 @@ import { createEncoder } from 'wasm-media-encoders'
 import type { RenderedSong } from '../audio/chip-wasm'
 
 export type AudioFormat = 'wav' | 'ogg'
-export type Ending = 'loop' | 'fade'
+/** Loop points for engines, a faded ending, or a fixed length (for video). */
+export type Ending = 'loop' | 'fade' | 'length'
 
 export interface ShapedAudio {
   samples: Float32Array
@@ -18,8 +19,28 @@ export interface ShapedAudio {
 }
 
 const MAX_FADE_SECONDS = 8
+/** The longest track Fit to length makes. */
+export const MAX_LENGTH_SECONDS = 20 * 60
 
-export function shapeAudio(r: RenderedSong, sampleRate: number, ending: Ending): ShapedAudio {
+/**
+ * `seconds` long exactly: the song, then its looping part (or the whole song, if it
+ * doesn't loop) again and again, fading out over the last few seconds.
+ */
+export function fitToLength(r: RenderedSong, sampleRate: number, seconds: number): Float32Array {
+  const total = Math.round(Math.min(MAX_LENGTH_SECONDS, Math.max(1, seconds)) * sampleRate)
+  const out = new Float32Array(total)
+  const start = r.looped ? r.loopStart : 0
+  const loop = r.samples.subarray(start)
+  out.set(r.samples.subarray(0, total))
+  for (let at = r.samples.length; at < total && loop.length; at += loop.length) out.set(loop.subarray(0, total - at), at)
+  // Fade over the last 4 seconds, or a fifth of a short track.
+  const fade = Math.min(Math.round(4 * sampleRate), Math.round(total / 5))
+  for (let i = total - fade; i < total; i++) out[i] *= (total - i) / fade
+  return out
+}
+
+export function shapeAudio(r: RenderedSong, sampleRate: number, ending: Ending, seconds = 0): ShapedAudio {
+  if (ending === 'length') return { samples: fitToLength(r, sampleRate, seconds), loop: null }
   const loopLength = r.samples.length - r.loopStart
   if (!r.looped || loopLength <= 0) return { samples: r.samples, loop: null }
   if (ending === 'loop') return { samples: r.samples, loop: { start: r.loopStart, length: loopLength } }
