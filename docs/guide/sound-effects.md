@@ -82,7 +82,7 @@ classic sounds carry the same code.
 ## Download
 
 - **E** downloads the current sound as **WAV** or **OGG** (pick the format and sample rate
-  next to the button). OGG files are many times smaller, which suits web games.
+  with the small sliders button next to it). OGG files are many times smaller, which suits web games.
 - **Download kept as .zip** saves every kept sound in that format, plus `sfx.json` with
   their names, synth and settings.
 

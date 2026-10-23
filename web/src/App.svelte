@@ -105,29 +105,39 @@
         return lab.move(shortcut.delta)
     }
   }
+
+  // A keyboard shortcut past the mode rail and play bar, to the first control of the page.
+  let main: HTMLElement
+  function skipToContent() {
+    main.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea, a[href], [tabindex="0"]')?.focus()
+  }
 </script>
 
 <svelte:window onkeydown={onKeydown} onhashchange={onHashChange} />
 
 <div class="shell" data-mode={route.mode}>
+  <button class="skip key" onclick={skipToContent}>Skip to content</button>
   <ModeRail current={route.mode} />
   <Transport mode={route.mode} />
-  {#if route.mode === 'compose'}
-    <ComposeView />
-    <section class="strips" aria-label="Chip channels">
-      {#each channelsFor(composer.song.chip) as info, channel (info.name)}
-        <ChannelStrip {channel} {info} />
-      {/each}
-    </section>
-  {:else if route.mode === 'convert'}
-    <ConvertView />
-  {:else if route.mode === 'account'}
-    <AccountView />
-  {:else if route.mode === 'shared' && route.slug}
-    <SharedView slug={route.slug} />
-  {:else}
-    <SfxLab />
-  {/if}
+  <!-- display: contents, so each view still places itself in the shell's grid. -->
+  <main bind:this={main}>
+    {#if route.mode === 'compose'}
+      <ComposeView />
+      <section class="strips" aria-label="Chip channels">
+        {#each channelsFor(composer.song.chip) as info, channel (info.name)}
+          <ChannelStrip {channel} {info} />
+        {/each}
+      </section>
+    {:else if route.mode === 'convert'}
+      <ConvertView />
+    {:else if route.mode === 'account'}
+      <AccountView />
+    {:else if route.mode === 'shared' && route.slug}
+      <SharedView slug={route.slug} />
+    {:else}
+      <SfxLab />
+    {/if}
+  </main>
 </div>
 
 <Toast message={toast.current} />
@@ -141,6 +151,23 @@
       'rail strips' auto
       / var(--rail-w) 1fr;
     height: 100%;
+  }
+
+  main {
+    display: contents;
+  }
+
+  /* Hidden until it gets keyboard focus. */
+  .skip {
+    position: fixed;
+    top: calc(var(--u) * 2);
+    left: calc(var(--u) * 2);
+    z-index: 10;
+    transform: translateY(-200%);
+  }
+
+  .skip:focus-visible {
+    transform: none;
   }
 
   .strips {

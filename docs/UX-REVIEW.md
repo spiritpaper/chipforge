@@ -26,20 +26,19 @@ MIDI fold under **Settings**. The SFX history now scrolls only its own list.
 4. **Compose on phones:** the editor starts below the fold, after the toolbar and song
    order. A collapsible header ("Song settings") would put the notes on screen first.
 
-## Smaller things (not changed yet)
+## Smaller things (done)
 
-5. **Keyboard focus starts in the wrong place.** The first Tab goes to the history list
-   on the right, then the page, then the navigation rail; there's no "skip to content"
-   link. Start with the preset buttons, then the current sound, then history.
-6. **SFX download row is crowded on phones.** The button, the WAV/OGG menu and the
-   sample-rate menu wrap awkwardly. Put format and rate behind one small settings menu
-   next to Download.
-7. **Account page without a server** explains self-hosting but gives no next step for
-   most people. Say plainly that everything is saved on this device, and link to the
+5. **Keyboard focus.** The Tab order already started at the mode rail; what was missing
+   was a way past it. A **Skip to content** button now appears on the first Tab and jumps
+   to the page's first control (on SFX Lab, the Chip/Classic switch). The page is wrapped
+   in a `main` landmark for screen readers.
+6. **SFX download row on phones.** Format and sample rate moved into a small popover
+   behind a sliders button next to Download; it closes on Escape or a click elsewhere.
+7. **Account page without a server** now opens with "You don't need an account", says
+   how to keep copies (Export in Compose, the kept-sounds .zip) and links to the
    self-hosting guide on the website.
-8. **Two synths, little explanation in the app.** The Chip/Classic switch only explains
-   itself in tooltips. A one-line note under it the first time ("Classic sounds like
-   jsfxr; Chip sounds like a real NES") would help newcomers.
+8. **Chip vs Classic.** A one-line note under the switch explains the selected synth
+   until you press **Got it**.
 
 ## Working well
 

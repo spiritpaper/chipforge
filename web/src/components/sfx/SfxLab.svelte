@@ -11,7 +11,15 @@
   const seconds = $derived(lab.samples.length / lab.renderedRate)
   const engine = $derived(current ? engineOf(current) : 'chip')
   const silent = $derived(current ? silenceReason(current.params, lab.samples, lab.renderedRate, engine) : null)
+
+  let optionsOpen = $state(false)
+  // Close the download options on a click anywhere else.
+  function closeOptions(e: PointerEvent) {
+    if (optionsOpen && !(e.target as Element).closest('.export')) optionsOpen = false
+  }
 </script>
+
+<svelte:window onpointerdown={closeOptions} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
@@ -69,23 +77,36 @@
             <button class="key" onclick={() => lab.exportSound()} title="Download this sound (E)">
               <PixelIcon name="download" /> Download {lab.exportFormat.toUpperCase()} <kbd>E</kbd>
             </button>
-            <select
-              aria-label="File format"
-              value={lab.exportFormat}
-              onchange={(e) => lab.setExportFormat(e.currentTarget.value as SfxFormat)}
+            <button
+              class="key options"
+              aria-expanded={optionsOpen}
+              aria-controls="download-options"
+              aria-label="Download options"
+              title="File format and sample rate"
+              onclick={() => (optionsOpen = !optionsOpen)}
             >
-              <option value="wav">WAV</option>
-              <option value="ogg">OGG</option>
-            </select>
-            <select
-              aria-label="Sample rate"
-              value={lab.exportRate}
-              onchange={(e) => lab.setExportRate(Number(e.currentTarget.value))}
-            >
-              {#each EXPORT_RATES as rate (rate)}
-                <option value={rate}>{rate / 1000} kHz</option>
-              {/each}
-            </select>
+              <PixelIcon name="sliders" />
+            </button>
+            {#if optionsOpen}
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div class="popover" id="download-options" onkeydown={(e) => e.key === 'Escape' && (optionsOpen = false)}>
+                <label>
+                  Format
+                  <select value={lab.exportFormat} onchange={(e) => lab.setExportFormat(e.currentTarget.value as SfxFormat)}>
+                    <option value="wav">WAV</option>
+                    <option value="ogg">OGG</option>
+                  </select>
+                </label>
+                <label>
+                  Sample rate
+                  <select value={lab.exportRate} onchange={(e) => lab.setExportRate(Number(e.currentTarget.value))}>
+                    {#each EXPORT_RATES as rate (rate)}
+                      <option value={rate}>{rate / 1000} kHz</option>
+                    {/each}
+                  </select>
+                </label>
+              </div>
+            {/if}
           </span>
           <button class="key" onclick={() => lab.copyLink()} title="Copy a link that recreates this exact sound (L)">
             <PixelIcon name="link" /> Copy link <kbd>L</kbd>
@@ -182,11 +203,46 @@
   }
 
   .export {
+    position: relative;
     display: inline-flex;
     gap: var(--u);
   }
 
+  .options {
+    padding: 0 calc(var(--u) * 2);
+  }
+
+  .options[aria-expanded='true'] {
+    background: var(--line);
+  }
+
+  .popover {
+    position: absolute;
+    top: calc(100% + var(--u));
+    right: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--u) * 2);
+    padding: calc(var(--u) * 3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-key);
+    background: var(--panel);
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
+  }
+
+  .popover label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(var(--u) * 3);
+    color: var(--muted);
+    font-size: var(--step--1);
+    white-space: nowrap;
+  }
+
   select {
+    min-height: 28px;
     padding: 0 calc(var(--u) * 2);
     border: 1px solid var(--line);
     border-radius: var(--radius-key);

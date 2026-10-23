@@ -22,11 +22,12 @@
   {#if account.status === 'checking'}
     <p class="muted">Checking…</p>
   {:else if account.status === 'unavailable'}
-    <p>Sync isn't available here.</p>
+    <p>You don't need an account. Everything you make is saved on this device and works offline.</p>
     <p class="muted">
-      Everything you make is saved in this browser and works offline. To sync songs and
-      sounds between devices and share links, use a ChipForge server: the hosted service, or
-      your own with <code>docker compose up</code> (see <code>deploy/</code> in the source).
+      To keep a copy elsewhere, download each song from <strong>Export</strong> in Compose and your
+      kept sounds as a .zip from the SFX Lab history. Syncing between devices and sharing by link
+      need a ChipForge server, which you can
+      <a href="https://spiritpaper.site/chipforge/deploy/README.html" target="_blank" rel="noopener">run yourself</a>.
     </p>
   {:else if account.status === 'signed-out'}
     <p>Sign in to sync your songs and sounds between devices and to share songs by link.</p>
@@ -236,7 +237,7 @@
     cursor: pointer;
   }
 
-  code {
-    font-family: var(--font-data);
+  .muted a {
+    color: var(--text);
   }
 </style>

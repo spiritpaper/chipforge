@@ -3,9 +3,16 @@
   import { lab } from '../../sfx/lab.svelte'
   import PixelIcon from '../PixelIcon.svelte'
   import ImportDialog from './ImportDialog.svelte'
+  import { readPref, writePref } from '../../lib/prefs'
 
   const presets = $derived(Object.entries(presetsFor(lab.engine)))
   let importing = $state(false)
+  // A one-line explanation of the two synths, until it's dismissed.
+  let explained = $state(readPref('sfx.engineNote') === 'seen')
+  function dismissNote() {
+    explained = true
+    writePref('sfx.engineNote', 'seen')
+  }
 </script>
 
 <section class="presets" aria-labelledby="presets-title">
@@ -33,6 +40,18 @@
       Import…
     </button>
   </div>
+  {#if !explained}
+    <p class="note">
+      {#if lab.engine === 'chip'}
+        <strong>Chip</strong> makes sounds a real NES could play, so they fit your ChipForge songs. Try
+        <strong>Classic</strong> for the sfxr sound, with saw and sine waves and a filter.
+      {:else}
+        <strong>Classic</strong> is the sfxr synth, as in jsfxr: saw and sine waves, a filter, and sounds
+        from jsfxr open here. <strong>Chip</strong> keeps to what a real NES could play.
+      {/if}
+      <button class="link" onclick={dismissNote}>Got it</button>
+    </p>
+  {/if}
   <div class="keys">
     {#each presets as [id, meta] (id)}
       <button
@@ -93,6 +112,28 @@
   .engine button[aria-checked='true'] {
     background: var(--line);
     color: var(--text);
+  }
+
+  .note {
+    max-width: 70ch;
+    color: var(--muted);
+    font-size: var(--step--1);
+  }
+
+  .note strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .link {
+    margin-left: var(--u);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font-size: inherit;
+    text-decoration: underline;
+    cursor: pointer;
   }
 
   .keys {
