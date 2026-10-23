@@ -56,5 +56,5 @@ Then [export](export.md) what you made for your [game](game-engines.md) or
    of one kind (Coin, Jump, Laser…). Press **M** for a close variation of the one you
    like, **S** to keep it, **E** to download it as a WAV.
 2. Open **Compose**, press **Space** to hear the starter song, then open **Songs** and
-   pick a template under **Start a new song** (Overworld, Dungeon, Boss, Victory).
+   pick a template under **Start a new song** (Overworld, Town, Menu, Boss, Level Clear…).
 3. Open **Convert**, drop in a song with a clear melody, and choose **Chip version**.

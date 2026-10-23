@@ -23,7 +23,8 @@ for your games.
   roll on the same patterns, instruments with drawable volume/tone/bend/chord
   macros, a song-order strip, undo, autosave, starter templates, MIDI keyboard
   input, MIDI export, opening songs from MIDI, MusicXML, ABC, FamiTracker text and
-  MOD files, and WAV/OGG export with loop points for game engines.
+  MOD files, key and scale help with snapping, one-click drum beats, and WAV/OGG
+  export with loop points for game engines, fit-to-length for videos, and stems.
 - **Convert** turns any recording into 8-bit: the **Lo-fi Filter** crunches it live,
   and **Chip version** transcribes its notes, beat and drums (Basic Pitch on your GPU
   via WebGL) and rebuilds it as an editable chip song. Nothing is uploaded.

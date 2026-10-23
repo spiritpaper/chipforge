@@ -24,8 +24,12 @@ at any time; notes and instruments carry over.
 - **Tempo** (BPM) and **Speed** (ticks per row) set how fast rows go. Each row is 1/4
   of a beat.
 
-Start from a template (**Songs → Start a new song**: Overworld, Dungeon, Boss, Victory)
-to see how a working song is put together.
+Start from a template (**Songs → Start a new song**) to see how a working song is put
+together:
+
+| Loops | Jingles |
+|---|---|
+| Overworld, Town, Menu, Title Screen, Dungeon, Boss, First Light | Victory, Level Clear, Game Over |
 
 ## Tracker
 
@@ -76,6 +80,22 @@ behind it.
 - **Keys:** arrows move the selection (Shift+↑/↓ by an octave), Shift+←/→ resizes,
   Delete removes, **Ctrl+A** selects every note, **Ctrl+C / X / V** copy, cut and paste
   at the row you last clicked, **Ctrl+D** duplicates right after the selection.
+
+### Staying in key
+
+If you don't read music, let the piano roll keep you in tune. Pick a **Key** (or press
+**Find key** to work it out from the notes you've written) and a scale: rows outside
+the scale go darker and the key's home note is marked on every octave. Tick **Snap to
+key** and new and moved notes land on notes of the key, and ↑/↓ step through the
+scale. Major, minor, harmonic minor, dorian, mixolydian, both pentatonics and blues are
+there; pentatonic scales are hard to sound wrong in.
+
+### Drums in one click
+
+Under the song order, pick a **Beat** (rock, driving, four on the floor, half-time,
+chiptune, breakbeat, march, shuffle, sparse) and press **This part** or **Every part**.
+It replaces that part's noise channel and adds the kick, snare and hi-hat instruments
+if the song doesn't have them. Edit the drums afterwards like any other notes.
 
 ## Instruments
 

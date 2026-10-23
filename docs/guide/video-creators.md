@@ -15,9 +15,17 @@ Converting someone else's song is different: see
 
 ## Quick recipes
 
-**Background loop for a video.** Start from a template (**Songs → Start a new song**),
-change the melody, then **Export → Audio** with **Fade out for listening** for a track
-with an ending, or **Loop for games** and loop it in your editor for as long as you need.
+**Background music exactly as long as your video.** Start from a template (**Songs →
+Start a new song**; Menu and Town are calm enough to talk over), change the melody,
+then **Export → Audio → Fit to length** and type the video's length, like `3:20`. The
+track ends right on time with a fade.
+
+**Music that ducks under your voice.** Tick **Stems** when you export: you get the full
+mix plus each channel on its own, all the same length. Put them on separate tracks in
+your editor and turn the melody (pulse 1) down while you speak, keeping the beat.
+
+**Jingles.** Level Clear, Victory and Game Over are short stingers for wins, fails and
+transitions.
 
 **Sound effects for edits.** In SFX Lab: Coin (**1**) for points or money, Power-up
 (**5**) for upgrades and reveals, Blip (**7**) and Select (**8**) for text popping in,
