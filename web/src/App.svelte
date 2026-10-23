@@ -88,13 +88,15 @@
       case 'play':
         return void lab.play()
       case 'preset':
-        return lab.generate(shortcut.preset)
+        return void lab.generateKey(shortcut.code)
       case 'mutate':
         return lab.mutate()
+      case 'variations':
+        return lab.variations()
       case 'keep':
         return lab.toggleKeep()
       case 'export':
-        return lab.exportWav()
+        return void lab.exportSound()
       case 'copyLink':
         return void lab.copyLink()
       case 'fineTune':

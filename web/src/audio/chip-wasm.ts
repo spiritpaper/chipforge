@@ -49,6 +49,26 @@ export interface ChipExports {
   sfx_preset_count(): number
   sfx_preset_key(i: number): number
   sfx_preset_key_len(i: number): number
+
+  // The classic (sfxr) engine: the same calls, plus `canonical` for imported sounds.
+  sfxr_new(): number
+  sfxr_free(ws: number): void
+  sfxr_params(ws: number): number
+  sfxr_generate(ws: number, preset: number, seed: number): void
+  sfxr_mutate(ws: number, seed: number, amount: number): void
+  sfxr_canonical(ws: number): void
+  sfxr_render(ws: number, sampleRate: number): number
+  sfxr_samples(ws: number): number
+  sfxr_param_count(): number
+  sfxr_param_min(i: number): number
+  sfxr_param_max(i: number): number
+  sfxr_param_default(i: number): number
+  sfxr_param_integer(i: number): number
+  sfxr_param_key(i: number): number
+  sfxr_param_key_len(i: number): number
+  sfxr_preset_count(): number
+  sfxr_preset_key(i: number): number
+  sfxr_preset_key_len(i: number): number
 }
 
 export async function instantiateChip(module: WebAssembly.Module): Promise<ChipExports> {

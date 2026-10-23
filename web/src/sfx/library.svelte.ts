@@ -44,7 +44,7 @@ class SfxLibrary {
     }
   }
 
-  add(input: Pick<SfxEntry, 'name' | 'preset' | 'seed' | 'params'>): SfxEntry {
+  add(input: Pick<SfxEntry, 'name' | 'preset' | 'seed' | 'params' | 'engine'>): SfxEntry {
     const entry: SfxEntry = { ...input, id: crypto.randomUUID(), starred: false, createdAt: Date.now() }
     this.entries = prune([entry, ...this.entries])
     this.selectedId = entry.id

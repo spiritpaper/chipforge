@@ -1,4 +1,4 @@
-// Hash routes: #/sfx (default), #/sfx?s=<share code>, #/compose, #/convert, #/account,
+// Hash routes: #/sfx (default), #/sfx?s=<share code>, #/sfx?x=<jsfxr code>, #/compose, #/convert, #/account,
 // #/s/<slug> (a shared song). The old #/demo (Sound check) opens the Composer.
 
 export type Mode = 'sfx' | 'compose' | 'convert' | 'account' | 'shared'
@@ -9,5 +9,8 @@ export function parseHash(hash: string): { mode: Mode; share: string | null; slu
   if (shared) return { mode: 'shared', share: null, slug: shared[1] }
   const mode: Mode =
     path === 'compose' || path === 'demo' ? 'compose' : path === 'convert' || path === 'account' ? path : 'sfx'
-  return { mode, share: new URLSearchParams(query).get('s') }
+  const params = new URLSearchParams(query)
+  // `x` carries a jsfxr code (a classic sound); `s` a chip sound.
+  const classic = params.get('x')
+  return { mode, share: classic ? `jsfxr:${classic}` : params.get('s') }
 }

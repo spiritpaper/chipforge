@@ -37,7 +37,7 @@
       <PixelIcon name="download" />
       Download kept as .zip
     </button>
-    <p>WAV files plus <code>sfx.json</code> with names and settings.</p>
+    <p>{lab.exportFormat.toUpperCase()} files plus <code>sfx.json</code> with names and settings.</p>
   </div>
 </aside>
 

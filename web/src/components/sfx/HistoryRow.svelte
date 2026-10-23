@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { lab } from '../../sfx/lab.svelte'
+  import { engineOf, lab } from '../../sfx/lab.svelte'
   import { peaks } from '../../sfx/analysis'
   import type { SfxEntry } from '../../sfx/library-core'
   import { waveColor } from '../../sfx/params'
@@ -11,7 +11,7 @@
   const BARS = 28
 
   const preview = $derived.by(() => {
-    const samples = lab.synth?.render(entry.params, THUMB_RATE) ?? new Float32Array(0)
+    const samples = lab.renderEntry(entry, THUMB_RATE)
     return { bars: peaks(samples, BARS), seconds: samples.length / THUMB_RATE }
   })
 
@@ -21,7 +21,7 @@
   })
 </script>
 
-<li bind:this={row} class:selected style:--wave={waveColor(entry.params)}>
+<li bind:this={row} class:selected style:--wave={waveColor(entry.params, engineOf(entry))}>
   <button class="pick" aria-current={selected ? 'true' : undefined} onclick={() => lab.select(entry.id)}>
     <svg class="thumb" viewBox="0 0 {BARS * 2} 16" preserveAspectRatio="none" aria-hidden="true">
       {#each preview.bars as v, i (i)}

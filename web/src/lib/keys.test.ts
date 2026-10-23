@@ -4,9 +4,9 @@ import { soloMask } from './mix'
 
 describe('sfxShortcut', () => {
   it('maps number keys to presets and letters to actions', () => {
-    expect(sfxShortcut('Digit1', false)).toEqual({ action: 'preset', preset: 'coin' })
-    expect(sfxShortcut('Digit0', false)).toEqual({ action: 'preset', preset: 'door' })
-    expect(sfxShortcut('KeyR', false)).toEqual({ action: 'preset', preset: 'random' })
+    expect(sfxShortcut('Digit1', false)).toEqual({ action: 'preset', code: 'Digit1' })
+    expect(sfxShortcut('Digit0', false)).toEqual({ action: 'preset', code: 'Digit0' })
+    expect(sfxShortcut('KeyR', false)).toEqual({ action: 'preset', code: 'KeyR' })
     expect(sfxShortcut('KeyM', false)).toEqual({ action: 'mutate' })
     expect(sfxShortcut('ArrowDown', false)).toEqual({ action: 'move', delta: 1 })
     expect(sfxShortcut('Space', false)).toEqual({ action: 'play' })

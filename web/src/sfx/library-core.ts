@@ -5,6 +5,8 @@ import type { SfxParams } from './synth'
 export interface SfxEntry {
   id: string
   name: string
+  /** The synth that makes it; absent means the chip engine (sounds from before there was a choice). */
+  engine?: 'classic'
   preset: string
   /** The seed that generated it; null for mutations, edits and shared sounds. */
   seed: number | null

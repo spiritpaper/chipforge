@@ -1,13 +1,13 @@
-import { PRESET_META } from '../sfx/params'
-
 export type SfxShortcut =
-  | { action: 'play' | 'mutate' | 'keep' | 'export' | 'copyLink' | 'fineTune' }
-  | { action: 'preset'; preset: string }
+  | { action: 'play' | 'mutate' | 'variations' | 'keep' | 'export' | 'copyLink' | 'fineTune' }
+  /** A preset key (1-9, 0, R); which preset depends on the engine. */
+  | { action: 'preset'; code: string }
   | { action: 'move'; delta: number }
 
 const SFX_KEYS: Record<string, SfxShortcut> = {
   Space: { action: 'play' },
   KeyM: { action: 'mutate' },
+  KeyV: { action: 'variations' },
   KeyS: { action: 'keep' },
   KeyE: { action: 'export' },
   KeyL: { action: 'copyLink' },
@@ -18,8 +18,7 @@ const SFX_KEYS: Record<string, SfxShortcut> = {
 
 export function sfxShortcut(code: string, shift: boolean): SfxShortcut | null {
   if (shift) return null
-  const preset = Object.entries(PRESET_META).find(([, m]) => m.code === code)
-  if (preset) return { action: 'preset', preset: preset[0] }
+  if (/^Digit\d$/.test(code) || code === 'KeyR') return { action: 'preset', code }
   return SFX_KEYS[code] ?? null
 }
 

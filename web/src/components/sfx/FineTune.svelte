@@ -1,18 +1,19 @@
 <script lang="ts">
-  import { lab } from '../../sfx/lab.svelte'
-  import { GROUPS, PARAM_META } from '../../sfx/params'
+  import { engineOf, lab } from '../../sfx/lab.svelte'
+  import { GROUPS, metaFor } from '../../sfx/params'
   import PixelIcon from '../PixelIcon.svelte'
   import ParamControl from './ParamControl.svelte'
 
   const params = $derived(lab.current?.params ?? {})
+  const engine = $derived(lab.current ? engineOf(lab.current) : 'chip')
   const groups = $derived(
     GROUPS.map((g) => ({
       ...g,
       specs: (lab.synth?.specs ?? []).filter((s) => {
-        const meta = PARAM_META[s.key]
+        const meta = metaFor(engine)[s.key]
         return meta?.group === g.id && (!meta.when || meta.when(params))
       }),
-    })),
+    })).filter((g) => g.specs.length > 0),
   )
 </script>
 
@@ -34,7 +35,7 @@
         <fieldset>
           <legend>{group.label}</legend>
           {#each group.specs as spec (spec.key)}
-            <ParamControl {spec} value={params[spec.key] ?? spec.default} />
+            <ParamControl {spec} {engine} value={params[spec.key] ?? spec.default} />
           {/each}
         </fieldset>
       {/each}

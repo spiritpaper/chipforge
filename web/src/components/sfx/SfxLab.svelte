@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { EXPORT_RATES, lab } from '../../sfx/lab.svelte'
-  import { PRESET_META, WAVES, presetLabel, silenceReason, waveColor } from '../../sfx/params'
+  import { EXPORT_RATES, VARIATIONS, engineOf, lab, type SfxFormat } from '../../sfx/lab.svelte'
+  import { presetLabel, presetsFor, silenceReason, waveColor, waveOf, wavesFor } from '../../sfx/params'
   import PixelIcon from '../PixelIcon.svelte'
   import FineTune from './FineTune.svelte'
   import HistoryList from './HistoryList.svelte'
@@ -9,10 +9,21 @@
 
   const current = $derived(lab.current)
   const seconds = $derived(lab.samples.length / lab.renderedRate)
-  const silent = $derived(current ? silenceReason(current.params, lab.samples, lab.renderedRate) : null)
+  const engine = $derived(current ? engineOf(current) : 'chip')
+  const silent = $derived(current ? silenceReason(current.params, lab.samples, lab.renderedRate, engine) : null)
 </script>
 
-<div class="lab" style:--wave={current ? waveColor(current.params) : 'var(--text)'}>
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  class="lab"
+  style:--wave={current ? waveColor(current.params, engine) : 'var(--text)'}
+  ondragover={(e) => e.dataTransfer?.types.includes('Files') && e.preventDefault()}
+  ondrop={(e) => {
+    if (!e.dataTransfer?.files.length) return
+    e.preventDefault()
+    void lab.importFiles(e.dataTransfer.files)
+  }}
+>
   <div class="main">
     <PresetBar />
 
@@ -31,15 +42,18 @@
             onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
           />
           <p class="facts">
-            {WAVES[current.params.wave]?.label} wave, {seconds.toFixed(2)} seconds{#if PRESET_META[current.preset]}, from
-              the {presetLabel(current.preset).toLowerCase()} preset{:else if current.preset === 'shared'}, opened
-              from a link{/if}
+            {wavesFor(engine)[waveOf(current.params, engine)]?.label} wave, {seconds.toFixed(2)} seconds{#if engine === 'classic'},
+              classic sfxr{/if}{#if presetsFor(engine)[current.preset]}, from the {presetLabel(current.preset).toLowerCase()}
+              preset{:else if current.preset === 'shared'}, opened from a link{:else if current.preset === 'imported'}, imported{/if}
           </p>
         </div>
 
         <div class="actions">
           <button class="key" onclick={() => lab.mutate()} title="A close variation of this sound (M)">
             <PixelIcon name="mutate" /> Mutate <kbd>M</kbd>
+          </button>
+          <button class="key" onclick={() => lab.variations()} title="Add {VARIATIONS} close variations to the history to pick from (V)">
+            <PixelIcon name="stack" /> Variations <kbd>V</kbd>
           </button>
           <button
             class="key keep"
@@ -52,11 +66,19 @@
             <kbd>S</kbd>
           </button>
           <span class="export">
-            <button class="key" onclick={() => lab.exportWav()} title="Download this sound as a WAV file (E)">
-              <PixelIcon name="download" /> Download WAV <kbd>E</kbd>
+            <button class="key" onclick={() => lab.exportSound()} title="Download this sound (E)">
+              <PixelIcon name="download" /> Download {lab.exportFormat.toUpperCase()} <kbd>E</kbd>
             </button>
             <select
-              aria-label="WAV sample rate"
+              aria-label="File format"
+              value={lab.exportFormat}
+              onchange={(e) => lab.setExportFormat(e.currentTarget.value as SfxFormat)}
+            >
+              <option value="wav">WAV</option>
+              <option value="ogg">OGG</option>
+            </select>
+            <select
+              aria-label="Sample rate"
               value={lab.exportRate}
               onchange={(e) => lab.setExportRate(Number(e.currentTarget.value))}
             >
@@ -68,6 +90,11 @@
           <button class="key" onclick={() => lab.copyLink()} title="Copy a link that recreates this exact sound (L)">
             <PixelIcon name="link" /> Copy link <kbd>L</kbd>
           </button>
+          {#if engine === 'classic'}
+            <button class="key" onclick={() => lab.copyJsfxr()} title="Copy a link that opens this sound in jsfxr (sfxr.me)">
+              <PixelIcon name="link" /> Copy for jsfxr
+            </button>
+          {/if}
         </div>
 
         {#if silent}

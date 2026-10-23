@@ -9,17 +9,26 @@ export interface RenderedSound {
   samples: Float32Array
 }
 
-/** A zip of WAVs plus `sfx.json`, a manifest a game's build step can read. */
-export function zipSounds(sounds: RenderedSound[], sampleRate: number): Uint8Array<ArrayBuffer> {
-  const files = uniqueFileNames(sounds.map((s) => s.entry.name), 'wav')
+/**
+ * A zip of sound files plus `sfx.json`, a manifest a game's build step can read. WAVs
+ * are made here; for OGG pass the `encoded` files (one per sound).
+ */
+export function zipSounds(
+  sounds: RenderedSound[],
+  sampleRate: number,
+  format: 'wav' | 'ogg' = 'wav',
+  encoded?: Uint8Array[],
+): Uint8Array<ArrayBuffer> {
+  const files = uniqueFileNames(sounds.map((s) => s.entry.name), format)
   const zip: Zippable = {}
   const manifest = sounds.map(({ entry, samples }, i) => {
-    zip[files[i]] = [encodeWav(samples, sampleRate), { level: 0 }]
+    zip[files[i]] = [encoded?.[i] ?? encodeWav(samples, sampleRate), { level: 0 }]
     return {
       name: entry.name,
       file: files[i],
       seconds: Number((samples.length / sampleRate).toFixed(4)),
       sampleRate,
+      engine: entry.engine ?? 'chip',
       preset: entry.preset,
       seed: entry.seed,
       params: entry.params,

@@ -6,24 +6,48 @@ import { readPref, writePref } from '../lib/prefs'
 import { toast } from '../lib/toast.svelte'
 import { download, zipSounds } from './export'
 import { library } from './library.svelte'
-import { editName, nextName, slugify } from './library-core'
-import { presetLabel } from './params'
+import { editName, nextName, slugify, type SfxEntry } from './library-core'
+import { presetLabel, presetsFor } from './params'
 import { decodeShare, encodeShare } from './share'
-import { SfxSynth } from './synth'
+import { fromFile, fromJsfxrCode, fromText, jsfxrLink, toJsfxrCode } from './jsfxr'
+import { SfxSynth, type Engine, type SfxParams } from './synth'
 import { encodeWav } from './wav'
+import type { EncodeRequest, EncodeResponse } from '../export/encode-worker'
+import EncodeWorker from '../export/encode-worker.ts?worker'
 
 const randomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0]
 
 export const EXPORT_RATES = [44_100, 48_000] as const
+export type SfxFormat = 'wav' | 'ogg'
+/** How many takes Variations adds. */
+export const VARIATIONS = 8
+
+function readLocks(): Set<string> {
+  try {
+    return new Set(JSON.parse(readPref('sfx.locks') ?? '[]') as string[])
+  } catch {
+    return new Set()
+  }
+}
+
+/** Share links for classic sounds carry a jsfxr code; this marks one in `openShared`. */
+export const JSFXR_SHARE = 'jsfxr:'
+
+export const engineOf = (entry: Pick<SfxEntry, 'engine'>): Engine => entry.engine ?? 'chip'
 
 class SfxLab {
-  synth = $state.raw<SfxSynth | null>(null)
+  synths = $state.raw<Record<Engine, SfxSynth> | null>(null)
+  /** The engine new sounds are made with. */
+  engine = $state<Engine>(readPref('sfx.engine') === 'classic' ? 'classic' : 'chip')
   status = $state<'loading' | 'ready' | 'error'>('loading')
   /** The selected sound, rendered at `renderedRate` for drawing and playback. */
   samples = $state.raw<Float32Array>(new Float32Array(0))
   renderedRate = $state(48_000)
   fineTuneOpen = $state(readPref('sfx.fineTune') === 'open')
   exportRate = $state<number>(Number(readPref('sfx.exportRate')) === 48_000 ? 48_000 : 44_100)
+  exportFormat = $state<SfxFormat>(readPref('sfx.format') === 'ogg' ? 'ogg' : 'wav')
+  /** Settings Mutate, Variations and new presets leave alone, as "engine:key". */
+  locked = $state.raw<Set<string>>(readLocks())
 
   /** The entry slider edits go into; editing anything else forks it first. */
   private draftId: string | null = null
@@ -36,8 +60,7 @@ class SfxLab {
 
   private async boot(shareCode: string | null) {
     try {
-      const synth = await SfxSynth.create(await loadChipModule())
-      this.synth = synth
+      this.synths = await SfxSynth.both(await loadChipModule())
       await library.load()
       if (shareCode) this.openShared(shareCode)
       if (library.entries.length === 0) this.create('coin', false)
@@ -53,33 +76,141 @@ class SfxLab {
     return library.selected
   }
 
+  /** The synth for the selected sound (fine-tune sliders come from it). */
+  get synth(): SfxSynth | null {
+    const current = this.current
+    return this.synths && current ? this.synths[engineOf(current)] : null
+  }
+
+  private synthOf(entry: Pick<SfxEntry, 'engine'>): SfxSynth | null {
+    return this.synths?.[engineOf(entry)] ?? null
+  }
+
+  /** Any sound, with its own engine (history thumbnails). */
+  renderEntry(entry: SfxEntry, sampleRate: number): Float32Array {
+    return this.synthOf(entry)?.render(entry.params, sampleRate) ?? new Float32Array(0)
+  }
+
+  setEngine(engine: Engine) {
+    this.engine = engine
+    writePref('sfx.engine', engine)
+  }
+
   openShared(code: string) {
-    const params = this.synth && decodeShare(code, this.synth.specs)
-    if (!params) {
-      this.notify('That share link is incomplete, so the sound could not be opened.')
-      return
+    if (code.startsWith(JSFXR_SHARE)) {
+      const params = fromJsfxrCode(code.slice(JSFXR_SHARE.length))
+      if (params) return this.addImported(params, 'Shared', 'shared')
+    } else {
+      const params = this.synths && decodeShare(code, this.synths.chip.specs)
+      if (params) {
+        library.add({ name: nextName(library.entries, 'Shared'), preset: 'shared', seed: null, params })
+        this.draftId = null
+        this.rerender()
+        return this.notify('Opened a shared sound. Press Space to hear it.')
+      }
     }
-    library.add({ name: nextName(library.entries, 'Shared'), preset: 'shared', seed: null, params })
+    this.notify('That share link is incomplete, so the sound could not be opened.')
+  }
+
+  /** Adds a classic sound from another tool (or a classic share link). */
+  private addImported(raw: SfxParams, name: string, preset: 'shared' | 'imported') {
+    const synth = this.synths?.classic
+    if (!synth) return
+    const params = synth.canonical({ ...synth.defaults(), ...raw })
+    library.add({ name: nextName(library.entries, name), engine: 'classic', preset, seed: null, params })
     this.draftId = null
     this.rerender()
-    this.notify('Opened a shared sound. Press Space to hear it.')
+    void this.play()
+    this.notify(preset === 'shared' ? 'Opened a shared sound.' : `Imported “${name}”. It plays exactly as it did in sfxr.`)
+  }
+
+  /** Pasted text: a jsfxr link or code, or jsfxr JSON. Returns false if it isn't one. */
+  importText(text: string): boolean {
+    const params = fromText(text)
+    if (!params) return false
+    this.addImported(params, 'Imported', 'imported')
+    return true
+  }
+
+  /** .sfs (sfxr), .rfx (rFXGen) or .json / .txt (jsfxr) files. */
+  async importFiles(files: Iterable<File>) {
+    let failed = 0
+    for (const file of files) {
+      const params = await fromFile(file).catch(() => null)
+      if (params) this.addImported(params, file.name.replace(/\.[^.]+$/, '') || 'Imported', 'imported')
+      else failed++
+    }
+    if (failed) this.notify(`${failed === 1 ? 'One file wasn’t' : `${failed} files weren’t`} an sfxr, jsfxr or rFXGen sound.`)
   }
 
   rerender(rate = this.renderedRate) {
     const current = this.current
-    if (!current || !this.synth) {
+    const synth = current && this.synthOf(current)
+    if (!current || !synth) {
       this.samples = new Float32Array(0)
       return
     }
-    this.samples = this.synth.render(current.params, rate)
+    this.samples = synth.render(current.params, rate)
     this.renderedRate = rate
   }
 
+  isLocked(engine: Engine, key: string): boolean {
+    return this.locked.has(`${engine}:${key}`)
+  }
+
+  toggleLock(engine: Engine, key: string) {
+    const next = new Set(this.locked)
+    const id = `${engine}:${key}`
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    this.locked = next
+    writePref('sfx.locks', JSON.stringify([...next]))
+  }
+
+  /** `params` with the locked settings copied from `from` (same engine only). */
+  private keepLocked(engine: Engine, params: SfxParams, from: SfxParams | undefined): SfxParams {
+    if (!from) return params
+    const out = { ...params }
+    for (const key of Object.keys(params)) if (this.isLocked(engine, key) && key in from) out[key] = from[key]
+    return out
+  }
+
+  /** Adds close takes of the current sound to the history, to audition with ↑/↓. */
+  variations(count = VARIATIONS) {
+    const current = this.current
+    const synth = current && this.synthOf(current)
+    if (!current || !synth) return
+    const engine = engineOf(current)
+    // Named after the sound they came from: "Laser 3 take 1", "Laser 3 take 2", …
+    const label = `${current.name.replace(/ take \d+$/, '')} take`
+    let first: SfxEntry | null = null
+    // Added oldest first, so the history lists them in order under the original.
+    for (let i = 0; i < count; i++) {
+      const params = this.keepLocked(engine, synth.mutate(current.params, randomSeed(), 0.15), current.params)
+      const entry = library.add({
+        name: nextName(library.entries, label),
+        engine: current.engine,
+        preset: current.preset,
+        seed: null,
+        params,
+      })
+      first ??= entry
+    }
+    if (first) library.select(first.id)
+    this.draftId = null
+    this.rerender()
+    void this.play()
+    this.notify(`Added ${count} variations. Press ↑ and ↓ to hear them, S to keep the ones you like.`)
+  }
+
   private create(preset: string, play = true) {
-    if (!this.synth) return
+    const synth = this.synths?.[this.engine]
+    if (!synth) return
     const seed = randomSeed()
-    const params = this.synth.generate(preset, seed)
-    library.add({ name: nextName(library.entries, presetLabel(preset)), preset, seed, params })
+    const previous = this.current && engineOf(this.current) === this.engine ? this.current.params : undefined
+    const params = this.keepLocked(this.engine, synth.generate(preset, seed), previous)
+    const engine = this.engine === 'classic' ? ('classic' as const) : undefined
+    library.add({ name: nextName(library.entries, presetLabel(preset)), engine, preset, seed, params })
     this.draftId = null
     this.rerender()
     if (play) void this.play()
@@ -89,11 +220,25 @@ class SfxLab {
     this.create(preset)
   }
 
+  /** A preset by its key (1-9, 0, R) in the current engine. */
+  generateKey(code: string): boolean {
+    const preset = Object.entries(presetsFor(this.engine)).find(([, m]) => m.code === code)
+    if (preset) this.create(preset[0])
+    return !!preset
+  }
+
   mutate() {
     const current = this.current
-    if (!current || !this.synth) return
-    const params = this.synth.mutate(current.params, randomSeed())
-    library.add({ name: nextName(library.entries, presetLabel(current.preset)), preset: current.preset, seed: null, params })
+    const synth = current && this.synthOf(current)
+    if (!current || !synth) return
+    const params = this.keepLocked(engineOf(current), synth.mutate(current.params, randomSeed()), current.params)
+    library.add({
+      name: nextName(library.entries, presetLabel(current.preset)),
+      engine: current.engine,
+      preset: current.preset,
+      seed: null,
+      params,
+    })
     this.draftId = null
     this.rerender()
     void this.play()
@@ -101,12 +246,13 @@ class SfxLab {
 
   setParam(key: string, value: number, commit: boolean) {
     let current = this.current
-    if (!current || !this.synth) return
+    const synth = current && this.synthOf(current)
+    if (!current || !synth) return
     if (this.draftId !== current.id) {
       current = library.add({ ...current, name: editName(current.name), seed: null, params: { ...current.params } })
       this.draftId = current.id
     }
-    library.update(current.id, { params: { ...current.params, [key]: this.synth.clamp(key, value) } })
+    library.update(current.id, { params: { ...current.params, [key]: synth.clamp(key, value) } })
     this.rerender()
     if (commit) void this.play()
   }
@@ -144,36 +290,84 @@ class SfxLab {
     if (current && name.trim()) library.update(current.id, { name: name.trim() })
   }
 
-  exportWav() {
-    const current = this.current
-    if (!current || !this.synth) return
-    const samples = this.synth.render(current.params, this.exportRate)
-    const file = `${slugify(current.name)}.wav`
-    download(encodeWav(samples, this.exportRate), file, 'audio/wav')
-    this.notify(`Saved ${file}`)
+  /** WAV here; OGG in a worker (the Vorbis encoder is WebAssembly). */
+  private async encode(samples: Float32Array, title: string, worker?: Worker): Promise<Uint8Array<ArrayBuffer>> {
+    if (this.exportFormat === 'wav') return encodeWav(samples, this.exportRate)
+    const own = worker ?? new EncodeWorker()
+    try {
+      const request: EncodeRequest = { samples, sampleRate: this.exportRate, format: 'ogg', title }
+      const reply = await new Promise<EncodeResponse>((resolve) => {
+        own.onmessage = (e: MessageEvent<EncodeResponse>) => resolve(e.data)
+        own.onerror = () => resolve({ ok: false, error: 'The encoder stopped unexpectedly.' })
+        own.postMessage(request, [samples.buffer])
+      })
+      if (!reply.ok) throw new Error(reply.error)
+      return reply.bytes
+    } finally {
+      if (!worker) own.terminate()
+    }
   }
 
-  exportKept() {
-    const synth = this.synth
-    if (!synth) return
+  async exportSound() {
+    const current = this.current
+    const synth = current && this.synthOf(current)
+    if (!current || !synth) return
+    const samples = synth.render(current.params, this.exportRate)
+    const file = `${slugify(current.name)}.${this.exportFormat}`
+    try {
+      const bytes = await this.encode(samples, current.name)
+      download(bytes, file, this.exportFormat === 'wav' ? 'audio/wav' : 'audio/ogg')
+      this.notify(`Saved ${file}`)
+    } catch (err) {
+      this.notify(`Export failed: ${err instanceof Error ? err.message : err}`)
+    }
+  }
+
+  setExportFormat(format: SfxFormat) {
+    this.exportFormat = format
+    writePref('sfx.format', format)
+  }
+
+  async exportKept() {
+    if (!this.synths) return
     const kept = library.entries.filter((e) => e.starred)
     if (kept.length === 0) {
       this.notify('Keep a sound first: press S or its star.')
       return
     }
-    const zip = zipSounds(
-      kept.map((entry) => ({ entry, samples: synth.render(entry.params, this.exportRate) })),
-      this.exportRate,
-    )
-    download(zip, 'chipforge-sfx.zip', 'application/zip')
-    this.notify(`Saved chipforge-sfx.zip with ${kept.length} ${kept.length === 1 ? 'sound' : 'sounds'}`)
+    const sounds = kept.map((entry) => ({ entry, samples: this.synthOf(entry)!.render(entry.params, this.exportRate) }))
+    const worker = this.exportFormat === 'ogg' ? new EncodeWorker() : undefined
+    try {
+      const encoded: Uint8Array[] = []
+      for (const s of sounds) encoded.push(await this.encode(s.samples.slice(), s.entry.name, worker))
+      download(zipSounds(sounds, this.exportRate, this.exportFormat, encoded), 'chipforge-sfx.zip', 'application/zip')
+      this.notify(`Saved chipforge-sfx.zip with ${kept.length} ${kept.length === 1 ? 'sound' : 'sounds'}`)
+    } catch (err) {
+      this.notify(`Export failed: ${err instanceof Error ? err.message : err}`)
+    } finally {
+      worker?.terminate()
+    }
   }
 
   shareUrl(): string | null {
     const current = this.current
-    if (!current || !this.synth) return null
-    const code = encodeShare(current.params, this.synth.specs)
-    return `${location.origin}${location.pathname}#/sfx?s=${code}`
+    const synth = current && this.synthOf(current)
+    if (!current || !synth) return null
+    // Classic sounds share as jsfxr codes, so the code also works in jsfxr itself.
+    const query = engineOf(current) === 'classic' ? `x=${toJsfxrCode(current.params)}` : `s=${encodeShare(current.params, synth.specs)}`
+    return `${location.origin}${location.pathname}#/sfx?${query}`
+  }
+
+  /** Copies a link that opens the selected classic sound in jsfxr (sfxr.me). */
+  async copyJsfxr() {
+    const current = this.current
+    if (!current || engineOf(current) !== 'classic') return
+    try {
+      await navigator.clipboard.writeText(jsfxrLink(current.params))
+      this.notify('Copied a jsfxr link (sfxr.me) for this sound.')
+    } catch {
+      this.notify('Your browser blocked the clipboard.')
+    }
   }
 
   async copyLink() {

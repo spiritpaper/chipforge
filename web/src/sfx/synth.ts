@@ -1,6 +1,11 @@
-// Main-thread wrapper around chipcore's SFX functions.
+// Main-thread wrapper around chipcore's two SFX engines: the chip synth (sounds a NES
+// could make) and the classic sfxr synth (jsfxr-compatible: saw and sine waves,
+// resonant filter, flanger).
 
 import { instantiateChip, type ChipExports } from '../audio/chip-wasm'
+
+/** Which synth a sound is made with. */
+export type Engine = 'chip' | 'classic'
 
 export interface ParamSpec {
   key: string
@@ -16,30 +21,78 @@ export type SfxParams = Record<string, number>
 
 const decoder = new TextDecoder()
 
+/** The wasm calls one engine needs; both engines export the same set. */
+interface EngineCalls {
+  new_(): number
+  params(ws: number): number
+  generate(ws: number, preset: number, seed: number): void
+  mutate(ws: number, seed: number, amount: number): void
+  render(ws: number, sampleRate: number): number
+  samples(ws: number): number
+  paramCount(): number
+  paramMin(i: number): number
+  paramMax(i: number): number
+  paramDefault(i: number): number
+  paramInteger(i: number): number
+  paramKey(i: number): number
+  paramKeyLen(i: number): number
+  presetCount(): number
+  presetKey(i: number): number
+  presetKeyLen(i: number): number
+  canonical?(ws: number): void
+}
+
+function calls(w: ChipExports, engine: Engine): EngineCalls {
+  if (engine === 'chip') {
+    return {
+      new_: w.sfx_new, params: w.sfx_params, generate: w.sfx_generate, mutate: w.sfx_mutate,
+      render: w.sfx_render, samples: w.sfx_samples, paramCount: w.sfx_param_count, paramMin: w.sfx_param_min,
+      paramMax: w.sfx_param_max, paramDefault: w.sfx_param_default, paramInteger: w.sfx_param_integer,
+      paramKey: w.sfx_param_key, paramKeyLen: w.sfx_param_key_len, presetCount: w.sfx_preset_count,
+      presetKey: w.sfx_preset_key, presetKeyLen: w.sfx_preset_key_len,
+    }
+  }
+  return {
+    new_: w.sfxr_new, params: w.sfxr_params, generate: w.sfxr_generate, mutate: w.sfxr_mutate,
+    render: w.sfxr_render, samples: w.sfxr_samples, paramCount: w.sfxr_param_count, paramMin: w.sfxr_param_min,
+    paramMax: w.sfxr_param_max, paramDefault: w.sfxr_param_default, paramInteger: w.sfxr_param_integer,
+    paramKey: w.sfxr_param_key, paramKeyLen: w.sfxr_param_key_len, presetCount: w.sfxr_preset_count,
+    presetKey: w.sfxr_preset_key, presetKeyLen: w.sfxr_preset_key_len, canonical: w.sfxr_canonical,
+  }
+}
+
 export class SfxSynth {
   readonly specs: ParamSpec[]
   readonly presets: string[]
   private readonly ws: number
+  private readonly c: EngineCalls
 
-  constructor(private readonly wasm: ChipExports) {
-    const str = (ptr: number, len: number) =>
-      decoder.decode(new Uint8Array(wasm.memory.buffer, ptr, len))
-    this.specs = Array.from({ length: wasm.sfx_param_count() }, (_, i) => ({
-      key: str(wasm.sfx_param_key(i), wasm.sfx_param_key_len(i)),
+  constructor(
+    private readonly wasm: ChipExports,
+    readonly engine: Engine = 'chip',
+  ) {
+    this.c = calls(wasm, engine)
+    const str = (ptr: number, len: number) => decoder.decode(new Uint8Array(wasm.memory.buffer, ptr, len))
+    this.specs = Array.from({ length: this.c.paramCount() }, (_, i) => ({
+      key: str(this.c.paramKey(i), this.c.paramKeyLen(i)),
       index: i,
-      min: wasm.sfx_param_min(i),
-      max: wasm.sfx_param_max(i),
-      default: wasm.sfx_param_default(i),
-      integer: wasm.sfx_param_integer(i) === 1,
+      min: this.c.paramMin(i),
+      max: this.c.paramMax(i),
+      default: this.c.paramDefault(i),
+      integer: this.c.paramInteger(i) === 1,
     }))
-    this.presets = Array.from({ length: wasm.sfx_preset_count() }, (_, i) =>
-      str(wasm.sfx_preset_key(i), wasm.sfx_preset_key_len(i)),
-    )
-    this.ws = wasm.sfx_new()
+    this.presets = Array.from({ length: this.c.presetCount() }, (_, i) => str(this.c.presetKey(i), this.c.presetKeyLen(i)))
+    this.ws = this.c.new_()
   }
 
-  static async create(module: WebAssembly.Module): Promise<SfxSynth> {
-    return new SfxSynth(await instantiateChip(module))
+  static async create(module: WebAssembly.Module, engine: Engine = 'chip'): Promise<SfxSynth> {
+    return new SfxSynth(await instantiateChip(module), engine)
+  }
+
+  /** Both engines, sharing one wasm instance. */
+  static async both(module: WebAssembly.Module): Promise<Record<Engine, SfxSynth>> {
+    const wasm = await instantiateChip(module)
+    return { chip: new SfxSynth(wasm, 'chip'), classic: new SfxSynth(wasm, 'classic') }
   }
 
   spec(key: string): ParamSpec | undefined {
@@ -59,9 +112,22 @@ export class SfxSynth {
     return s.integer ? Math.round(v) : v
   }
 
+  /**
+   * Imported values in range, keeping the sound: the classic engine maps values sfxr
+   * allows outside its sliders to ones that sound the same; the chip engine clamps.
+   */
+  canonical(params: SfxParams): SfxParams {
+    this.write(params)
+    if (this.c.canonical) {
+      this.c.canonical(this.ws)
+      return this.read()
+    }
+    return Object.fromEntries(this.specs.map((s) => [s.key, this.clamp(s.key, params[s.key] ?? s.default)]))
+  }
+
   // Views are created per call: wasm memory can grow and detach older views.
   private paramView() {
-    return new Float32Array(this.wasm.memory.buffer, this.wasm.sfx_params(this.ws), this.specs.length)
+    return new Float32Array(this.wasm.memory.buffer, this.c.params(this.ws), this.specs.length)
   }
 
   private read(): SfxParams {
@@ -76,19 +142,19 @@ export class SfxSynth {
 
   generate(preset: string, seed: number): SfxParams {
     const index = this.presets.indexOf(preset)
-    this.wasm.sfx_generate(this.ws, index < 0 ? this.presets.length - 1 : index, seed >>> 0)
+    this.c.generate(this.ws, index < 0 ? this.presets.length - 1 : index, seed >>> 0)
     return this.read()
   }
 
   mutate(params: SfxParams, seed: number, amount = 0.1): SfxParams {
     this.write(params)
-    this.wasm.sfx_mutate(this.ws, seed >>> 0, amount)
+    this.c.mutate(this.ws, seed >>> 0, amount)
     return this.read()
   }
 
   render(params: SfxParams, sampleRate: number): Float32Array {
     this.write(params)
-    const length = this.wasm.sfx_render(this.ws, sampleRate)
-    return new Float32Array(this.wasm.memory.buffer, this.wasm.sfx_samples(this.ws), length).slice()
+    const length = this.c.render(this.ws, sampleRate)
+    return new Float32Array(this.wasm.memory.buffer, this.c.samples(this.ws), length).slice()
   }
 }

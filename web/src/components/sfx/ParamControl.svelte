@@ -1,12 +1,13 @@
 <script lang="ts">
   import { lab } from '../../sfx/lab.svelte'
-  import { PARAM_META, SLIDER_STEPS, WAVES, fromPosition, toPosition } from '../../sfx/params'
-  import type { ParamSpec } from '../../sfx/synth'
+  import { SLIDER_STEPS, fromPosition, metaFor, toPosition, wavesFor } from '../../sfx/params'
+  import type { Engine, ParamSpec } from '../../sfx/synth'
   import PixelIcon from '../PixelIcon.svelte'
 
-  let { spec, value }: { spec: ParamSpec; value: number } = $props()
+  let { spec, value, engine = 'chip' }: { spec: ParamSpec; value: number; engine?: Engine } = $props()
 
-  const meta = $derived(PARAM_META[spec.key])
+  const meta = $derived(metaFor(engine)[spec.key])
+  const locked = $derived(lab.isLocked(engine, spec.key))
   const id = $derived(`param-${spec.key}`)
   const position = $derived(toPosition(value, spec.min, spec.max, meta.scale))
 
@@ -18,7 +19,7 @@
   <div class="control" role="radiogroup" aria-label={meta.label}>
     <span class="label" title={meta.tech}>{meta.label}</span>
     <div class="waves">
-      {#each WAVES as wave, i (wave.label)}
+      {#each wavesFor(engine) as wave, i (wave.label)}
         <button
           class="wave"
           role="radio"
@@ -40,7 +41,18 @@
 {:else}
   <div class="control">
     <div class="row">
-      <label class="label" for={id} title="{meta.tech}. Double-click the slider to reset.">{meta.label}</label>
+      <span class="name">
+        <label class="label" for={id} title="{meta.tech}. Double-click the slider to reset.">{meta.label}</label>
+        <button
+          class="lock"
+          aria-pressed={locked}
+          aria-label="{locked ? 'Unlock' : 'Lock'} {meta.label}"
+          title={locked ? 'Locked: Mutate, Variations and new presets keep this value' : 'Lock this value'}
+          onclick={() => lab.toggleLock(engine, spec.key)}
+        >
+          <PixelIcon name="lock" size={12} />
+        </button>
+      </span>
       <output for={id}>{meta.format(value)}</output>
     </div>
     <input
@@ -72,6 +84,30 @@
   .label {
     color: var(--text);
     cursor: help;
+  }
+
+  .name {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--u);
+  }
+
+  .lock {
+    display: inline-flex;
+    padding: 2px;
+    border: 0;
+    border-radius: 3px;
+    background: none;
+    color: var(--line);
+    cursor: pointer;
+  }
+
+  .lock:hover {
+    color: var(--muted);
+  }
+
+  .lock[aria-pressed='true'] {
+    color: var(--pulse2);
   }
 
   output {
