@@ -72,6 +72,19 @@ function gmKind(gm: number): DrumKind {
   return 'snare'
 }
 
+/** Whether a part often plays more than one note at a time (chords, two hands). */
+function playsChords(notes: MidiNote[]): boolean {
+  const sorted = notes.slice().sort((a, b) => a.tick - b.tick)
+  let overlapping = 0
+  let end = -Infinity
+  for (const n of sorted) {
+    // Overlapping by more than a quarter of the note, not just a legato smudge.
+    if (end - n.tick > n.duration / 4) overlapping++
+    end = Math.max(end, n.tick + n.duration)
+  }
+  return overlapping > sorted.length * 0.1
+}
+
 export function midiToSong(midi: MidiFile, title: string): { song: Song; report: ImportReport } {
   const ticksPerRow = midi.division / ROWS_PER_BEAT
   const lines: string[] = []
@@ -103,8 +116,13 @@ export function midiToSong(midi: MidiFile, title: string): { song: Song; report:
   const kit: Record<DrumKind, number> = { kick: 3, snare: 4, hat: 5, open: 6 }
   const channels: Cell[][] = [0, 1, 2].map(() => Array(totalRows).fill(EMPTY_CELL))
 
-  if (byPitch.length === 1) {
-    // One part (a piano piece, say): melody on top, bass line from its lowest notes.
+  if (byPitch.length === 1 && !playsChords(byPitch[0].notes)) {
+    // One melody line (a folk tune, say): it's the melody; there's no bass to find.
+    channels[0] = monophonic(toRows(byPitch[0].notes, ticksPerRow), totalRows, 'high', 0)
+    lines.push(`The melody comes from ${byPitch[0].label}; it's a single line, so the other channels start empty.`)
+  } else if (byPitch.length === 1) {
+    // One part playing several notes at once (a piano piece, say): melody on top,
+    // bass line from its lowest notes.
     channels[0] = monophonic(toRows(byPitch[0].notes, ticksPerRow), totalRows, 'high', 0)
     channels[2] = monophonic(toRows(byPitch[0].notes, ticksPerRow), totalRows, 'low', 2)
     lines.push(`Melody and bass both come from ${byPitch[0].label}.`)

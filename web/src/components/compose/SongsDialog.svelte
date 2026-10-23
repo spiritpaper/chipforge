@@ -1,8 +1,7 @@
 <script lang="ts">
   import { composer } from '../../composer/composer.svelte'
-  import { MidiError, parseMidi } from '../../midi/smf'
-  import { midiToSong, type ImportReport } from '../../midi/convert'
-  import { validateSong } from '../../song/validate'
+  import type { ImportReport } from '../../midi/convert'
+  import { importSongFile, SongImportError, SONG_FILE_TYPES } from '../../song/import'
   import { TEMPLATES } from '../../song/templates'
 
   let { open = $bindable(false) }: { open: boolean } = $props()
@@ -15,27 +14,12 @@
 
   async function importFile(file: File) {
     importError = null
-    if (/\.json$/i.test(file.name)) {
-      let song = null
-      try {
-        song = validateSong(JSON.parse(await file.text()))
-      } catch {
-        // Reported below.
-      }
-      if (song) {
-        await composer.create(song)
-        report = { title: song.title, lines: ['Opened as a new song; the original file is unchanged.'] }
-      } else importError = 'That file is not a ChipForge song, or it is damaged.'
-      fileInput.value = ''
-      return
-    }
     try {
-      const title = file.name.replace(/\.midi?$/i, '') || 'Imported song'
-      const { song, report: r } = midiToSong(parseMidi(new Uint8Array(await file.arrayBuffer())), title)
+      const { song, report: r } = await importSongFile(file)
       await composer.create(song)
       report = r
     } catch (err) {
-      importError = err instanceof MidiError ? err.message : 'That file could not be read as MIDI.'
+      importError = err instanceof SongImportError ? err.message : 'That file could not be read.'
     } finally {
       fileInput.value = ''
     }
@@ -74,8 +58,9 @@
     {/each}
   </ul>
   <div class="new-row">
-    <button class="key" onclick={() => fileInput.click()}>Open a MIDI or song file…</button>
-    <input bind:this={fileInput} type="file" accept=".mid,.midi,audio/midi,.json,application/json" hidden onchange={(e) => e.currentTarget.files?.[0] && importFile(e.currentTarget.files[0])} />
+    <button class="key" onclick={() => fileInput.click()}>Open a song file…</button>
+    <span class="formats">MIDI, MusicXML (MuseScore and others), ABC, FamiTracker text, MOD</span>
+    <input bind:this={fileInput} type="file" accept={SONG_FILE_TYPES} hidden onchange={(e) => e.currentTarget.files?.[0] && importFile(e.currentTarget.files[0])} />
   </div>
 
   {#if importError}
@@ -118,6 +103,11 @@
     border-radius: var(--radius-key);
     background: var(--ink);
     color: var(--text);
+  }
+
+  .formats {
+    color: var(--muted);
+    font-size: var(--step--1);
   }
 
   dialog::backdrop {
